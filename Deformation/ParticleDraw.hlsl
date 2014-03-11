@@ -10,44 +10,44 @@
 
 struct VSParticleIn
 {
-	float4  color   : COLOR;
+    float4  color   : COLOR;
     uint    id      : SV_VertexID;
 };
 
 struct VSParticleDrawOut
 {
     float3 pos			: POSITION;
-	float3 normal		: TEXCOORD3;
-	float3 mpid1		: TEXCOORD1;
-	float3 mpid2		: TEXCOORD2;
-	float4 color		: COLOR;
+    float3 normal		: TEXCOORD3;
+    float3 mpid1		: TEXCOORD1;
+    float3 mpid2		: TEXCOORD2;
+    float4 color		: COLOR;
 };
 
 struct GSParticleDrawOut
 {
     float2 tex			: TEXCOORD0;
-	float3 normal		: TEXCOORD3;
-	float3 mpid1		: TEXCOORD1;
-	float3 mpid2		: TEXCOORD2;
-	float4 color		: COLOR;
-	float4 pos			: SV_Position;
+    float3 normal		: TEXCOORD3;
+    float3 mpid1		: TEXCOORD1;
+    float3 mpid2		: TEXCOORD2;
+    float4 color		: COLOR;
+    float4 pos			: SV_Position;
 };
 
 struct PSParticleDrawIn
 {
     float2 tex			: TEXCOORD0;
-	float3 normal		: TEXCOORD3;
-	float3 mpid1		: TEXCOORD1;
-	float3 mpid2		: TEXCOORD2;
-	float4 color		: COLOR;
+    float3 normal		: TEXCOORD3;
+    float3 mpid1		: TEXCOORD1;
+    float3 mpid2		: TEXCOORD2;
+    float4 color		: COLOR;
 };
 
 struct Particle
 {
-	float4 pos			: SV_Position;
-	float4 normal		: TEXCOORD3;
-	float4 mpid1		: TEXCOORD1;
-	float4 mpid2		: TEXCOORD2;
+    float4 pos			: SV_Position;
+    float4 normal		: TEXCOORD3;
+    float4 mpid1		: TEXCOORD1;
+    float4 mpid2		: TEXCOORD2;
 };
 
 Texture2D		            g_txDiffuse;
@@ -99,12 +99,12 @@ VSParticleDrawOut VSParticleDraw(VSParticleIn input)
     VSParticleDrawOut output;
     
     output.pos = g_bufParticle[input.id].pos.xyz;
-	output.normal = g_bufParticle[input.id].normal.xyz;
-	output.mpid1 = g_bufParticle[input.id].mpid1.xyz;
-	output.mpid2 = g_bufParticle[input.id].mpid2.xyz;
+    output.normal = g_bufParticle[input.id].normal.xyz;
+    output.mpid1 = g_bufParticle[input.id].mpid1.xyz;
+    output.mpid2 = g_bufParticle[input.id].mpid2.xyz;
 
-	// load colour from Particle color
-	output.color = input.color;
+    // load colour from Particle color
+    output.color = input.color;
     
     return output;
 }
@@ -116,26 +116,26 @@ VSParticleDrawOut VSParticleDraw(VSParticleIn input)
 void GSParticleDraw(point VSParticleDrawOut input[1], inout TriangleStream<GSParticleDrawOut> SpriteStream)
 {
 
-	GSParticleDrawOut output;
+    GSParticleDrawOut output;
     
-	for(int i=0; i<4; i++)
-	{
-		//highlight green particles
-		float green = input[0].color.g;
-		if((green-0.9f) > 0) green = 2.5f;
-		else green = 1.0f;
+    for(int i=0; i<4; i++)
+    {
+        //highlight green particles
+        float green = input[0].color.g;
+        if((green-0.9f) > 0) green = 2.5f;
+        else green = 1.0f;
 
-		float3 position = g_positions[i] * g_fParticleRad * green;
-		position = mul( position, (float3x3)g_mInvView ) + input[0].pos;
-		output.pos = mul( float4(position,1.0), g_mWorldViewProj ); 
-		output.color = input[0].color;        
-		output.tex = g_texcoords[i];
-		output.normal = normalize(mul(input[0].normal, (float3x3)g_mInvView));	//supposedly correct world normal
-		output.mpid1 = input[0].mpid1;
-		output.mpid2 = input[0].mpid2;
-		SpriteStream.Append(output);
-	}
-	SpriteStream.RestartStrip();
+        float3 position = g_positions[i] * g_fParticleRad * green;
+        position = mul( position, (float3x3)g_mInvView ) + input[0].pos;
+        output.pos = mul( float4(position,1.0), g_mWorldViewProj ); 
+        output.color = input[0].color;        
+        output.tex = g_texcoords[i];
+        output.normal = normalize(mul(input[0].normal, (float3x3)g_mInvView));	//supposedly correct world normal
+        output.mpid1 = input[0].mpid1;
+        output.mpid2 = input[0].mpid2;
+        SpriteStream.Append(output);
+    }
+    SpriteStream.RestartStrip();
 }
 
 //
