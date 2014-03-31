@@ -25,10 +25,9 @@
 #include <sstream>
 #include <vector>
 #include <time.h>
+#include "Deformable.h"
+#include "Constants.h"
 
-
-#define GET_X_LPARAM(lp)                        ((int)(short)LOWORD(lp))
-#define GET_Y_LPARAM(lp)                        ((int)(short)HIWORD(lp))
 
 using namespace DirectX;
 
@@ -102,38 +101,18 @@ int									g_nPickOriginX;
 int									g_nPickOriginY;
 
 std::ofstream						debug;
-std::vector<std::vector<float>>		g_vVertices;					// file import data > model vertices
-std::vector<std::vector<float>>		g_vNormals;						// file import data > model vertex normals
-std::vector<std::vector<int>>		g_vFaces;						// file import data > model faces (index from 1)
+
+vec2float							g_vVertices;					//* file import data > model vertices
+vec2float							g_vNormals;						//* file import data > model vertex normals
+vec2int								g_vFaces;						//* file import data > model faces (index from 1)
 bool								g_bPicking = false;				// RBUTTON is pressed
 bool								g_bRM2Texture = false;			// render model to texture for picking
-XMFLOAT3							g_vVolCubeO;					// offset verctor added to every volumetric masspoint
-XMFLOAT3							g_vModelO(100, 100, 100);		// offset vector for the model
+XMFLOAT3							g_vVolCubeO;					//* offset verctor added to every volumetric masspoint
+XMFLOAT3							g_vModelO(100, 100, 100);		//* offset vector for the model
 XMFLOAT4							g_vLightPosition(0, 0, -10000, 1);// light position
-int									g_nNumParticles;				// number of particles in the loaded model
-int									g_nVolCubeCell;					// cell size of volcube
+int									g_nNumParticles;				//* number of particles in the loaded model
+int									g_nVolCubeCell;					//* cell size of volcube
 
-#define VCUBEWIDTH		19											// n*n*n inner cube, (n+1)*(n+1)*(n+1) outer cube
-#define VOLCUBE1_COUNT	VCUBEWIDTH*VCUBEWIDTH*VCUBEWIDTH			// number of masspoints in the smaller volumetric cube
-#define VOLCUBE2_COUNT	(VCUBEWIDTH+1)*(VCUBEWIDTH+1)*(VCUBEWIDTH+1) // number of masspoints in the bigger volumetric cube
-
-// volcube neighbouring data
-#define NB_SAME_LEFT			0x20								// 0010 0000, has left neighbour
-#define NB_SAME_RIGHT			0x10								// 0001 0000, has right neighbour
-#define NB_SAME_DOWN			0x08								// 0000 1000, ...
-#define NB_SAME_UP				0x04								// 0000 0100
-#define NB_SAME_FRONT			0x02								// 0000 0010
-#define NB_SAME_BACK			0x01								// 0000 0001
-// NEAR = lower end of Z axis, nearer to the viewer
-// FAR = higher Z values, farther into the screen
-#define NB_OTHER_NEAR_BOT_LEFT	0x80								// 1000 0000
-#define NB_OTHER_NEAR_BOT_RIGHT	0x40								// 0100 0000
-#define NB_OTHER_NEAR_TOP_LEFT	0x20								// 0010 0000
-#define NB_OTHER_NEAR_TOP_RIGHT	0x10								// 0001 0000
-#define NB_OTHER_FAR_BOT_LEFT	0x08								// 0000 1000
-#define NB_OTHER_FAR_BOT_RIGHT	0x04								// 0000 0100
-#define NB_OTHER_FAR_TOP_LEFT	0x02								// 0000 0010
-#define NB_OTHER_FAR_TOP_RIGHT	0x01								// 0000 0001
 
 struct PARTICLE_VERTEX
 {
@@ -351,9 +330,9 @@ void ReadModel()
 		getline(input, line);
 
 		// split at spaces
-		std::vector<float> v;
-		std::vector<float> n;
-		std::vector<int> f;
+		vec1float v;
+		vec1float n;
+		vec1int f;
 		std::istringstream buf(line);
 		std::istream_iterator<std::string> start(buf), end;
 		std::vector<std::string> parts(start, end);
@@ -380,7 +359,7 @@ void ReadModel()
 		else if (line[0] == 'f'){
 			// parse
 			for (auto& s : parts){
-				f.push_back((float)atoi(s.c_str()));
+				f.push_back(atoi(s.c_str()));
 			}
 			//store
 			g_vFaces.push_back(f);
@@ -578,16 +557,16 @@ void LoadVolumetricCubes(MASSPOINT* volcube1, MASSPOINT* volcube2, PARTICLE* par
 			}
 		}
 	}
-	XMFLOAT3 x;
+	XMFLOAT3 vx;
 	// Set edge masspoints to 1
 	for (int i = 0; i < g_nNumParticles; i++)
 	{
-		x = indexcube[i].vc1index;
-		nvc1[(int)x.z][(int)x.y][(int)x.x] = 1; nvc1[(int)x.z][(int)x.y][(int)x.x + 1] = 1; nvc1[(int)x.z][(int)x.y + 1][(int)x.x] = 1; nvc1[(int)x.z][(int)x.y + 1][(int)x.x + 1] = 1;
-		nvc1[(int)x.z + 1][(int)x.y][(int)x.x] = 1; nvc1[(int)x.z + 1][(int)x.y][(int)x.x + 1] = 1; nvc1[(int)x.z + 1][(int)x.y + 1][(int)x.x] = 1; nvc1[(int)x.z + 1][(int)x.y + 1][(int)x.x + 1] = 1;
-		x = indexcube[i].vc2index;
-		nvc2[(int)x.z][(int)x.y][(int)x.x] = 1; nvc2[(int)x.z][(int)x.y][(int)x.x + 1] = 1; nvc2[(int)x.z][(int)x.y + 1][(int)x.x] = 1; nvc2[(int)x.z][(int)x.y + 1][(int)x.x + 1] = 1;
-		nvc2[(int)x.z + 1][(int)x.y][(int)x.x] = 1; nvc2[(int)x.z + 1][(int)x.y][(int)x.x + 1] = 1; nvc2[(int)x.z + 1][(int)x.y + 1][(int)x.x] = 1; nvc2[(int)x.z + 1][(int)x.y + 1][(int)x.x + 1] = 1;
+		vx = indexcube[i].vc1index;
+		nvc1[(int)vx.z][(int)vx.y][(int)vx.x] = 1; nvc1[(int)vx.z][(int)vx.y][(int)vx.x + 1] = 1; nvc1[(int)vx.z][(int)vx.y + 1][(int)vx.x] = 1; nvc1[(int)vx.z][(int)vx.y + 1][(int)vx.x + 1] = 1;
+		nvc1[(int)vx.z + 1][(int)vx.y][(int)vx.x] = 1; nvc1[(int)vx.z + 1][(int)vx.y][(int)vx.x + 1] = 1; nvc1[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x] = 1; nvc1[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x + 1] = 1;
+		vx = indexcube[i].vc2index;
+		nvc2[(int)vx.z][(int)vx.y][(int)vx.x] = 1; nvc2[(int)vx.z][(int)vx.y][(int)vx.x + 1] = 1; nvc2[(int)vx.z][(int)vx.y + 1][(int)vx.x] = 1; nvc2[(int)vx.z][(int)vx.y + 1][(int)vx.x + 1] = 1;
+		nvc2[(int)vx.z + 1][(int)vx.y][(int)vx.x] = 1; nvc2[(int)vx.z + 1][(int)vx.y][(int)vx.x + 1] = 1; nvc2[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x] = 1; nvc2[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x + 1] = 1;
 	}
 
 	// Set outer masspoints to 2 - 1st volcube

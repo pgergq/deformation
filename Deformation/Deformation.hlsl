@@ -72,7 +72,7 @@ float3 acceleration(MassPoint a, MassPoint b, uint mode)
 {
 	float invlen = 1.0f / length(a.newpos - b.newpos);
 	float3 v = (a.newpos - a.oldpos - b.newpos + b.oldpos) / dt;// + ab*dt - aa*dt;
-		float len;
+	float len;
 	// 0 == same cube, 1 == other cube, 2 == same cube+second neighbour
 	switch (mode){
 	case 0: len = vccell; break;
@@ -202,7 +202,7 @@ void CSMain2(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 			float len = length(ovolcube2[ind].newpos.xyz - eyePos.xyz);			// current 
 			float3 v_curr = pickDir * len + eyePos.xyz;							// current position
 
-				volcube2[ind].acc.xyz = float3(0, 0, 0);
+			volcube2[ind].acc.xyz = float3(0, 0, 0);
 			volcube2[ind].oldpos = ovolcube2[ind].newpos;
 			volcube2[ind].newpos.xyz = v_curr;
 

@@ -137,6 +137,7 @@
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>DXUT.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>4100;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalOptions> %(AdditionalOptions)</AdditionalOptions>
@@ -376,7 +377,10 @@
     <None Include="..\..\DXUT11\Optional\directx.ico" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Deformable.cpp" />
     <ClCompile Include="Deformation.cpp" />
+    <ClInclude Include="Constants.h" />
+    <ClInclude Include="Deformable.h" />
     <CLInclude Include="WaitDlg.h" />
   </ItemGroup>
   <ItemGroup>
