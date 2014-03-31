@@ -22,6 +22,7 @@
 #define VCUBEWIDTH		19											// n*n*n inner cube, (n+1)*(n+1)*(n+1) outer cube
 #define VOLCUBE1_COUNT	VCUBEWIDTH*VCUBEWIDTH*VCUBEWIDTH			// number of masspoints in the smaller volumetric cube
 #define VOLCUBE2_COUNT	(VCUBEWIDTH+1)*(VCUBEWIDTH+1)*(VCUBEWIDTH+1) // number of masspoints in the bigger volumetric cube
+#define MODEL_OFFSET	100
 
 // volcube neighbouring data
 #define NB_SAME_LEFT			0x20								// 0010 0000, has left neighbour
@@ -40,6 +41,14 @@
 #define NB_OTHER_FAR_BOT_RIGHT	0x04								// 0000 0100
 #define NB_OTHER_FAR_TOP_LEFT	0x02								// 0000 0010
 #define NB_OTHER_FAR_TOP_RIGHT	0x01								// 0000 0001
+
+
+
+// typedefs for easier handling, also used in Deformation.cpp
+typedef std::vector<float> vec1float;
+typedef std::vector<int> vec1int;
+typedef std::vector<std::vector<float>> vec2float;
+typedef std::vector<std::vector<int>> vec2int;
 
 
 #endif

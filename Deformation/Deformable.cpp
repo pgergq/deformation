@@ -11,6 +11,7 @@
 
 #include "Deformable.h"
 #include "Constants.h"
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -18,18 +19,17 @@
 //--------------------------------------------------------------------------------------
 // Constructor
 //--------------------------------------------------------------------------------------
-Deformable::Deformable(int i, std::string x){
+Deformable::Deformable(std::string x){
 
-	this->index = i;
-	this->file = x;
-
-	this->init();
+	this->file = x;		// file must be .obj formatted, with equal number of vertices and vertex normals (plus optional face data)
+	this->import();
+	this->initVars();
 }
 
 //--------------------------------------------------------------------------------------
-// Init Deformable model data: import vertices|normals|faces from file
+// Init (1) Deformable model data: import vertices|normals|faces from file
 //--------------------------------------------------------------------------------------
-void Deformable::init(){
+void Deformable::import(){
 
 	// Open file
 	std::ifstream input;
@@ -78,6 +78,15 @@ void Deformable::init(){
 		}
 	}
 
+	// Close file
+	input.close();
+}
+
+//--------------------------------------------------------------------------------------
+// Init (2) Deformable model data: initialize cube cell size, cube pos and model pos
+//--------------------------------------------------------------------------------------
+void Deformable::initVars(){
+
 	// get/set space division parameters
 	float minx, miny, minz, maxx, maxy, maxz;
 	maxx = minx = this->vertices[0][1];
@@ -104,14 +113,47 @@ void Deformable::init(){
 	// ceil((float)(tight+50)/100)*100 = upper 100 neighbour of tight
 	tmp = ceil((float)tmp / VCUBEWIDTH);
 	tmp = ceil((float)(tmp + 50) / 100) * 100;
-	g_nVolCubeCell = (int)tmp;
+	this->cubeCellSize = (int)tmp;
 
 	// Set global volumetric cube offsets to align the model
-	g_vVolCubeO = XMFLOAT3(floor(minx), floor(miny), floor(minz));
+	this->cubePos = XMFLOAT3(floor(minx), floor(miny), floor(minz));
+	this->modelPos = XMFLOAT3(MODEL_OFFSET, MODEL_OFFSET, MODEL_OFFSET);
 
-	// Set model vertex count
-	g_nNumParticles = g_vVertices.size();
+	// Set data
+	this->vertexCount = this->vertices.size();
+	this->normalCount = this->normals.size();
+	this->faceCount = this->faces.size();
 
+	// Assert
+	if (this->vertexCount != this->normalCount){
+		std::cout << "[ERROR]: vertexCount and normalCount are not equal!" << std::endl;
+	}
+}
+
+//--------------------------------------------------------------------------------------
+// Init (3) Deformable model data: initialize particle container (position+normal)
+//--------------------------------------------------------------------------------------
+void Deformable::initParticles(){
+
+	// Load model vertices + normals
+	for (int i = 0; i < this->vertexCount; i++)
+	{
+		PARTICLE push { XMFLOAT4(0, 0, 0, 1), XMFLOAT4(0, 0, 0, 1), XMFLOAT4(0, 0, 0, 0), XMFLOAT4(0, 0, 0, 0) };
+		
+		// position
+		XMVECTOR tmp = XMVectorAdd(XMVectorSet(this->vertices[i][1], this->vertices[i][2], this->vertices[i][3], 1),
+						XMVectorSet(this->modelPos.x, this->modelPos.y, this->modelPos.z, 0));
+		XMStoreFloat4(&push.pos, tmp);
+
+		// normalized normals -> store the endpoint of the normals (=npos)
+		float len = this->normals[i][1] * this->normals[i][1] + this->normals[i][2] * this->normals[i][2] + this->normals[i][3] * this->normals[i][3];
+		len = (len == 0 ? -1 : sqrtf(len));
+		XMVECTOR tmp2 = XMVectorSet((float)this->normals[i][1] / len, (float)this->normals[i][2] / len, (float)this->normals[i][3] / len, 1);
+		XMStoreFloat4(&push.npos, XMVectorAdd(tmp, XMVector3Normalize(tmp2)));
+
+		// store temporary vector in container
+		particles.push_back(push);
+	}
 }
 
 
@@ -132,7 +174,4 @@ void Deformable::init(){
 
 
 
-
-
-
-Deformable::~Deformable(){}
+Deformable::~Deformable(){ /* nothing dynamic to dispose of*/ }

@@ -148,32 +148,6 @@ struct CB_CS
 	float im;				// inverse mass of masspoints
 };
 
-struct MASSPOINT
-{
-	XMFLOAT4 oldpos;		// previous position of masspoint
-	XMFLOAT4 newpos;		// current position of masspoint
-	XMFLOAT4 acc;			// masspoint acceleration
-	unsigned int neighbour_same;	// neighbour_data mask in the same volcube
-	unsigned int neighbour_other;	// neighbour_data mask in the other volcube
-};
-
-struct PARTICLE
-{
-	XMFLOAT4 pos;			// model vertex position in world space
-	XMFLOAT4 npos;			// model vertex normal's end point (normal = (npos-pos))
-	XMFLOAT4 mpid1;			// model masscube ID (#1)
-	XMFLOAT4 mpid2;			// model masscube ID (#2)
-};
-
-struct INDEXER
-{
-	XMFLOAT3 vc1index;
-	XMFLOAT3 vc2index;
-	float w1[8];
-	float w2[8];
-	float nw1[8];
-	float nw2[8];
-};
 INDEXER* indexcube;
 
 //--------------------------------------------------------------------------------------
@@ -420,7 +394,7 @@ void LoadModel(PARTICLE* pParticles)
 	for (int i = 0; i < g_nNumParticles; i++)
 	{
 		XMVECTOR tmp = XMVectorAdd(XMVectorSet(g_vVertices[i][1], g_vVertices[i][2], g_vVertices[i][3], 1),
-			XMVectorSet(g_vModelO.x, g_vModelO.y, g_vModelO.z, 0));
+			XMVectorSet(g_vModelO.x, g_vModelO.y, g_vModelO.z, 0));	//***nem fog kelleni az eltolás, done in deformable
 		XMStoreFloat4(&pParticles[i].pos, tmp);
 
 		// normalized normals -> store the endpoint of the normals (=npos)

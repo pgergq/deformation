@@ -24,6 +24,8 @@
   <ItemGroup>
     <CLInclude Include="WaitDlg.h" />
     <ClCompile Include="Deformation.cpp" />
+    <ClInclude Include="Deformable.h" />
+    <ClInclude Include="Constants.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ParticleDraw.hlsl">
@@ -39,5 +41,8 @@
     <ResourceCompile Include="Deformation.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Deformable.cpp" />
   </ItemGroup>
 </Project>
