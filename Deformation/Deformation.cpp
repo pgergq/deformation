@@ -89,10 +89,7 @@ ID3D11Buffer*                       g_pcbGS = nullptr;
 
 ID3D11ShaderResourceView*           g_pParticleTexRV = nullptr;
 
-float                               g_fSpread = 400.0f;
-float								g_fStiffness = 100.0f;
-float								g_fDamping = -3.0f;
-float								g_fInvMass = 1.0f;
+
 int									g_nWindowWidth = 800;
 int									g_nWindowHeight = 600;
 int									g_nCurrentMouseX;
@@ -536,11 +533,23 @@ void LoadVolumetricCubes(MASSPOINT* volcube1, MASSPOINT* volcube2, PARTICLE* par
 	for (int i = 0; i < g_nNumParticles; i++)
 	{
 		vx = indexcube[i].vc1index;
-		nvc1[(int)vx.z][(int)vx.y][(int)vx.x] = 1; nvc1[(int)vx.z][(int)vx.y][(int)vx.x + 1] = 1; nvc1[(int)vx.z][(int)vx.y + 1][(int)vx.x] = 1; nvc1[(int)vx.z][(int)vx.y + 1][(int)vx.x + 1] = 1;
-		nvc1[(int)vx.z + 1][(int)vx.y][(int)vx.x] = 1; nvc1[(int)vx.z + 1][(int)vx.y][(int)vx.x + 1] = 1; nvc1[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x] = 1; nvc1[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x + 1] = 1;
+		nvc1[(int)vx.z][(int)vx.y][(int)vx.x] = 1;
+		nvc1[(int)vx.z][(int)vx.y][(int)vx.x + 1] = 1;
+		nvc1[(int)vx.z][(int)vx.y + 1][(int)vx.x] = 1;
+		nvc1[(int)vx.z][(int)vx.y + 1][(int)vx.x + 1] = 1;
+		nvc1[(int)vx.z + 1][(int)vx.y][(int)vx.x] = 1;
+		nvc1[(int)vx.z + 1][(int)vx.y][(int)vx.x + 1] = 1;
+		nvc1[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x] = 1;
+		nvc1[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x + 1] = 1;
 		vx = indexcube[i].vc2index;
-		nvc2[(int)vx.z][(int)vx.y][(int)vx.x] = 1; nvc2[(int)vx.z][(int)vx.y][(int)vx.x + 1] = 1; nvc2[(int)vx.z][(int)vx.y + 1][(int)vx.x] = 1; nvc2[(int)vx.z][(int)vx.y + 1][(int)vx.x + 1] = 1;
-		nvc2[(int)vx.z + 1][(int)vx.y][(int)vx.x] = 1; nvc2[(int)vx.z + 1][(int)vx.y][(int)vx.x + 1] = 1; nvc2[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x] = 1; nvc2[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x + 1] = 1;
+		nvc2[(int)vx.z][(int)vx.y][(int)vx.x] = 1;
+		nvc2[(int)vx.z][(int)vx.y][(int)vx.x + 1] = 1;
+		nvc2[(int)vx.z][(int)vx.y + 1][(int)vx.x] = 1;
+		nvc2[(int)vx.z][(int)vx.y + 1][(int)vx.x + 1] = 1;
+		nvc2[(int)vx.z + 1][(int)vx.y][(int)vx.x] = 1;
+		nvc2[(int)vx.z + 1][(int)vx.y][(int)vx.x + 1] = 1;
+		nvc2[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x] = 1;
+		nvc2[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x + 1] = 1;
 	}
 
 	// Set outer masspoints to 2 - 1st volcube

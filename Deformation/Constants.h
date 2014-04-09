@@ -14,8 +14,8 @@
 
 // constant defines for Deformation.cpp and Deformable.cpp
 
-#define GET_X_LPARAM(lp)                        ((int)(short)LOWORD(lp))
-#define GET_Y_LPARAM(lp)                        ((int)(short)HIWORD(lp))
+#define GET_X_LPARAM(lp)		((int)(short)LOWORD(lp))
+#define GET_Y_LPARAM(lp)		((int)(short)HIWORD(lp))
 
 
 /// DEFORMATION defines
@@ -49,6 +49,12 @@ typedef std::vector<float> vec1float;
 typedef std::vector<int> vec1int;
 typedef std::vector<std::vector<float>> vec2float;
 typedef std::vector<std::vector<int>> vec2int;
+
+// some constants
+float							g_fSpread = 400.0f;
+float							g_fStiffness = 100.0f;
+float							g_fDamping = -3.0f;
+float							g_fInvMass = 1.0f;
 
 
 #endif

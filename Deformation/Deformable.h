@@ -27,10 +27,12 @@ private:
 	// variables
 
 	// functions
-	void import();				// initialize data from file, only available to ctor
+	void importFile();			// initialize data from file, only available to ctor
 	void initVars();			// initialize variables (cube cell size, cube and model position)
 	void initParticles();		// initialize particle container
 	void initMasscubes();		// initialize masscube data
+	void initIndexer();			// init indexer structure
+	void initNeighbouring();	// set neighbouring data
 
 public:
 	// variables
