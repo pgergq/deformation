@@ -16,6 +16,7 @@
 #include <sstream>
 #include <algorithm>
 
+
 //--------------------------------------------------------------------------------------
 // Constructor
 //--------------------------------------------------------------------------------------
@@ -284,9 +285,231 @@ void Deformable::initIndexer(){
 //--------------------------------------------------------------------------------------
 void Deformable::initNeighbouring(){
 
+	/// Set proper neighbouring data (disable masspoints with no model points)
+	unsigned int nvc1[VCUBEWIDTH][VCUBEWIDTH][VCUBEWIDTH];
+	unsigned int nvc2[VCUBEWIDTH + 1][VCUBEWIDTH + 1][VCUBEWIDTH + 1];
+	for (int z = 0; z < VCUBEWIDTH; z++){
+		for (int y = 0; y < VCUBEWIDTH; y++){
+			for (int x = 0; x < VCUBEWIDTH; x++){
+				nvc1[z][y][x] = 0;
+			}
+		}
+	}
+	for (int z = 0; z < VCUBEWIDTH + 1; z++){
+		for (int y = 0; y < VCUBEWIDTH + 1; y++){
+			for (int x = 0; x < VCUBEWIDTH + 1; x++){
+				nvc2[z][y][x] = 0;
+			}
+		}
+	}
+	XMFLOAT3 vx;
+	// Set edge masspoints to 1
+	for (int i = 0; i < this->vertexCount; i++)
+	{
+		vx = this->indexcube[i].vc1index;
+		nvc1[(int)vx.z][(int)vx.y][(int)vx.x] = 1;
+		nvc1[(int)vx.z][(int)vx.y][(int)vx.x + 1] = 1;
+		nvc1[(int)vx.z][(int)vx.y + 1][(int)vx.x] = 1;
+		nvc1[(int)vx.z][(int)vx.y + 1][(int)vx.x + 1] = 1;
+		nvc1[(int)vx.z + 1][(int)vx.y][(int)vx.x] = 1;
+		nvc1[(int)vx.z + 1][(int)vx.y][(int)vx.x + 1] = 1;
+		nvc1[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x] = 1;
+		nvc1[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x + 1] = 1;
+		vx = this->indexcube[i].vc2index;
+		nvc2[(int)vx.z][(int)vx.y][(int)vx.x] = 1;
+		nvc2[(int)vx.z][(int)vx.y][(int)vx.x + 1] = 1;
+		nvc2[(int)vx.z][(int)vx.y + 1][(int)vx.x] = 1;
+		nvc2[(int)vx.z][(int)vx.y + 1][(int)vx.x + 1] = 1;
+		nvc2[(int)vx.z + 1][(int)vx.y][(int)vx.x] = 1;
+		nvc2[(int)vx.z + 1][(int)vx.y][(int)vx.x + 1] = 1;
+		nvc2[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x] = 1;
+		nvc2[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x + 1] = 1;
+	}
+
+	// Set outer masspoints to 2 - 1st volcube
+	//left+
+	for (int z = 0; z < VCUBEWIDTH; z++){
+		for (int y = 0; y < VCUBEWIDTH; y++){
+			for (int x = 0; x < VCUBEWIDTH; x++){
+				if (nvc1[z][y][x] == 1) break;
+				else nvc1[z][y][x] = 2;
+			}
+		}
+	}
+	//right+
+	for (int z = 0; z < VCUBEWIDTH; z++){
+		for (int y = 0; y < VCUBEWIDTH; y++){
+			for (int x = VCUBEWIDTH - 1; x >= 0; x--){
+				if (nvc1[z][y][x] == 1) break;
+				else nvc1[z][y][x] = 2;
+			}
+		}
+	}
+	//bottom+
+	for (int z = 0; z < VCUBEWIDTH; z++){
+		for (int x = 0; x < VCUBEWIDTH; x++){
+			for (int y = 0; y < VCUBEWIDTH; y++){
+				if (nvc1[z][y][x] == 1) break;
+				else nvc1[z][y][x] = 2;
+			}
+		}
+	}
+	//up+
+	for (int z = 0; z < VCUBEWIDTH; z++){
+		for (int x = 0; x < VCUBEWIDTH; x++){
+			for (int y = VCUBEWIDTH - 1; y >= 0; y--){
+				if (nvc1[z][y][x] == 1) break;
+				else nvc1[z][y][x] = 2;
+			}
+		}
+	}
+	//front+
+	for (int y = 0; y < VCUBEWIDTH; y++){
+		for (int x = 0; x < VCUBEWIDTH; x++){
+			for (int z = 0; z < VCUBEWIDTH; z++){
+				if (nvc1[z][y][x] == 1) break;
+				else nvc1[z][y][x] = 2;
+			}
+		}
+	}
+	//back+
+	for (int y = 0; y < VCUBEWIDTH; y++){
+		for (int x = 0; x < VCUBEWIDTH; x++){
+			for (int z = VCUBEWIDTH - 1; z >= 0; z--){
+				if (nvc1[z][y][x] == 1) break;
+				else nvc1[z][y][x] = 2;
+			}
+		}
+	}
+	//Set outer masspoints to 2 - 2nd volcube
+	//left+
+	for (int z = 0; z < VCUBEWIDTH + 1; z++){
+		for (int y = 0; y < VCUBEWIDTH + 1; y++){
+			for (int x = 0; x < VCUBEWIDTH + 1; x++){
+				if (nvc2[z][y][x] == 1) break;
+				else nvc2[z][y][x] = 2;
+			}
+		}
+	}
+	//right+
+	for (int z = 0; z < VCUBEWIDTH + 1; z++){
+		for (int y = 0; y < VCUBEWIDTH + 1; y++){
+			for (int x = VCUBEWIDTH; x >= 0; x--){
+				if (nvc2[z][y][x] == 1) break;
+				else nvc2[z][y][x] = 2;
+			}
+		}
+	}
+	//bottom+
+	for (int z = 0; z < VCUBEWIDTH + 1; z++){
+		for (int x = 0; x < VCUBEWIDTH + 1; x++){
+			for (int y = 0; y < VCUBEWIDTH + 1; y++){
+				if (nvc2[z][y][x] == 1) break;
+				else nvc2[z][y][x] = 2;
+			}
+		}
+	}
+	//up+
+	for (int z = 0; z < VCUBEWIDTH + 1; z++){
+		for (int x = 0; x < VCUBEWIDTH + 1; x++){
+			for (int y = VCUBEWIDTH; y >= 0; y--){
+				if (nvc2[z][y][x] == 1) break;
+				else nvc2[z][y][x] = 2;
+			}
+		}
+	}
+	//front+
+	for (int y = 0; y < VCUBEWIDTH + 1; y++){
+		for (int x = 0; x < VCUBEWIDTH + 1; x++){
+			for (int z = 0; z < VCUBEWIDTH + 1; z++){
+				if (nvc2[z][y][x] == 1) break;
+				else nvc2[z][y][x] = 2;
+			}
+		}
+	}
+	//back+
+	for (int y = 0; y < VCUBEWIDTH + 1; y++){
+		for (int x = 0; x < VCUBEWIDTH + 1; x++){
+			for (int z = VCUBEWIDTH; z >= 0; z--){
+				if (nvc2[z][y][x] == 1) break;
+				else nvc2[z][y][x] = 2;
+			}
+		}
+	}
+
+	// Correct neighbouring in 1st volcube
+	unsigned int ind, mask;
+	for (int i = 0; i < VCUBEWIDTH; i++)
+	{
+		for (int j = 0; j < VCUBEWIDTH; j++)
+		{
+			for (int k = 0; k < VCUBEWIDTH; k++)
+			{
+				ind = i*VCUBEWIDTH*VCUBEWIDTH + j*VCUBEWIDTH + k;
+
+				// same volcube bitmasks
+				mask = 0x00;
+				mask = k != 0 && nvc1[i][j][k - 1] != 2 ? mask | NB_SAME_LEFT : mask;
+				mask = k != (VCUBEWIDTH - 1) && nvc1[i][j][k + 1] != 2 ? mask | NB_SAME_RIGHT : mask;
+				mask = j != 0 && nvc1[i][j - 1][k] != 2 ? mask | NB_SAME_DOWN : mask;
+				mask = j != (VCUBEWIDTH - 1) && nvc1[i][j + 1][k] != 2 ? mask | NB_SAME_UP : mask;
+				mask = i != 0 && nvc1[i - 1][j][k] != 2 ? mask | NB_SAME_FRONT : mask;
+				mask = i != (VCUBEWIDTH - 1) && nvc1[i + 1][j][k] != 2 ? mask | NB_SAME_BACK : mask;
+				this->masscube1[ind].neighbour_same = mask;
+
+				// other volcube bitmasks
+				mask = 0x00;
+				mask = nvc2[i][j][k] != 2 ? mask | NB_OTHER_NEAR_BOT_LEFT : mask;
+				mask = nvc2[i][j][k + 1] != 2 ? mask | NB_OTHER_NEAR_BOT_RIGHT : mask;
+				mask = nvc2[i][j + 1][k] != 2 ? mask | NB_OTHER_NEAR_TOP_LEFT : mask;
+				mask = nvc2[i][j + 1][k + 1] != 2 ? mask | NB_OTHER_NEAR_TOP_RIGHT : mask;
+				mask = nvc2[i + 1][j][k] != 2 ? mask | NB_OTHER_FAR_BOT_LEFT : mask;
+				mask = nvc2[i + 1][j][k + 1] != 2 ? mask | NB_OTHER_FAR_BOT_RIGHT : mask;
+				mask = nvc2[i + 1][j + 1][k] != 2 ? mask | NB_OTHER_FAR_TOP_LEFT : mask;
+				mask = nvc2[i + 1][j + 1][k + 1] != 2 ? mask | NB_OTHER_FAR_TOP_RIGHT : mask;
+				this->masscube1[ind].neighbour_other = mask;
+			}
+		}
+	}
+
+	// Correct neighbouring in 2nd volcube
+	for (int i = 0; i < VCUBEWIDTH + 1; i++)
+	{
+		for (int j = 0; j < VCUBEWIDTH + 1; j++)
+		{
+			for (int k = 0; k < VCUBEWIDTH + 1; k++)
+			{
+				ind = i*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1) + j*(VCUBEWIDTH + 1) + k;
+
+				// same volcube bitmasks
+				mask = 0x00;
+				mask = k != 0 && nvc2[i][j][k - 1] != 2 ? mask | NB_SAME_LEFT : mask;
+				mask = k != (VCUBEWIDTH) && nvc2[i][j][k + 1] != 2 ? mask | NB_SAME_RIGHT : mask;
+				mask = j != 0 && nvc2[i][j - 1][k] != 2 ? mask | NB_SAME_DOWN : mask;
+				mask = j != (VCUBEWIDTH) && nvc2[i][j + 1][k] != 2 ? mask | NB_SAME_UP : mask;
+				mask = i != 0 && nvc2[i - 1][j][k] != 2 ? mask | NB_SAME_FRONT : mask;
+				mask = i != (VCUBEWIDTH) && nvc2[i + 1][j][k] != 2 ? mask | NB_SAME_BACK : mask;
+				this->masscube2[ind].neighbour_same = mask;
+
+				//// other volcube bitmasks
+				mask = 0x00;
+				mask = (i != 0 && j != 0 && k != 0) && nvc1[i - 1][j - 1][k - 1] != 2 ? mask | NB_OTHER_NEAR_BOT_LEFT : mask;
+				mask = (i != 0 && j != 0 && k != VCUBEWIDTH) && nvc1[i - 1][j - 1][k] != 2 ? mask | NB_OTHER_NEAR_BOT_RIGHT : mask;
+				mask = (i != 0 && j != VCUBEWIDTH && k != 0) && nvc1[i - 1][j][k - 1] != 2 ? mask | NB_OTHER_NEAR_TOP_LEFT : mask;
+				mask = (i != 0 && j != VCUBEWIDTH && k != VCUBEWIDTH) && nvc1[i - 1][j][k] != 2 ? mask | NB_OTHER_NEAR_TOP_RIGHT : mask;
+				mask = (i != VCUBEWIDTH && j != 0 && k != 0) && nvc1[i][j - 1][k - 1] != 2 ? mask | NB_OTHER_FAR_BOT_LEFT : mask;
+				mask = (i != VCUBEWIDTH && j != 0 && k != VCUBEWIDTH) && nvc1[i][j - 1][k] != 2 ? mask | NB_OTHER_FAR_BOT_RIGHT : mask;
+				mask = (i != VCUBEWIDTH && j != VCUBEWIDTH && k != 0) && nvc1[i][j][k - 1] != 2 ? mask | NB_OTHER_FAR_TOP_LEFT : mask;
+				mask = (i != VCUBEWIDTH && j != VCUBEWIDTH && k != VCUBEWIDTH) && nvc1[i][j][k] != 2 ? mask | NB_OTHER_FAR_TOP_RIGHT : mask;
+				this->masscube2[ind].neighbour_other = mask;
+			}
+		}
+	}
 }
 
-
+//--------------------------------------------------------------------------------------
+// 
+//--------------------------------------------------------------------------------------
 
 
 

@@ -21,6 +21,42 @@
 // namespace
 using namespace DirectX;
 
+// typedefs for easier handling, also used in Deformation.cpp
+typedef std::vector<float> vec1float;
+typedef std::vector<int> vec1int;
+typedef std::vector<std::vector<float>> vec2float;
+typedef std::vector<std::vector<int>> vec2int;
+
+
+// Helper structures
+struct MASSPOINT
+{
+	XMFLOAT4 oldpos;		// previous position of masspoint
+	XMFLOAT4 newpos;		// current position of masspoint
+	XMFLOAT4 acc;			// masspoint acceleration
+	unsigned int neighbour_same;	// neighbour_data mask in the same volcube
+	unsigned int neighbour_other;	// neighbour_data mask in the other volcube
+};
+
+struct PARTICLE
+{
+	XMFLOAT4 pos;			// model vertex position in world space
+	XMFLOAT4 npos;			// model vertex normal's end point (normal = (npos-pos))
+	XMFLOAT4 mpid1;			// model masscube ID (#1)
+	XMFLOAT4 mpid2;			// model masscube ID (#2)
+};
+
+struct INDEXER
+{
+	XMFLOAT3 vc1index;
+	XMFLOAT3 vc2index;
+	float w1[8];
+	float w2[8];
+	float nw1[8];
+	float nw2[8];
+};
+
+
 class Deformable final
 {
 private:
@@ -60,34 +96,6 @@ public:
 	Deformable(std::string);	// construct with file name
 	Deformable(const Deformable&) = delete;	// no copy constructor
 	
-};
-
-// Helper structures
-struct MASSPOINT
-{
-	XMFLOAT4 oldpos;		// previous position of masspoint
-	XMFLOAT4 newpos;		// current position of masspoint
-	XMFLOAT4 acc;			// masspoint acceleration
-	unsigned int neighbour_same;	// neighbour_data mask in the same volcube
-	unsigned int neighbour_other;	// neighbour_data mask in the other volcube
-};
-
-struct PARTICLE
-{
-	XMFLOAT4 pos;			// model vertex position in world space
-	XMFLOAT4 npos;			// model vertex normal's end point (normal = (npos-pos))
-	XMFLOAT4 mpid1;			// model masscube ID (#1)
-	XMFLOAT4 mpid2;			// model masscube ID (#2)
-};
-
-struct INDEXER
-{
-	XMFLOAT3 vc1index;
-	XMFLOAT3 vc2index;
-	float w1[8];
-	float w2[8];
-	float nw1[8];
-	float nw2[8];
 };
 
 #endif

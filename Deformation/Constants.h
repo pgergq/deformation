@@ -43,18 +43,10 @@
 #define NB_OTHER_FAR_TOP_RIGHT	0x01								// 0000 0001
 
 
-
-// typedefs for easier handling, also used in Deformation.cpp
-typedef std::vector<float> vec1float;
-typedef std::vector<int> vec1int;
-typedef std::vector<std::vector<float>> vec2float;
-typedef std::vector<std::vector<int>> vec2int;
-
 // some constants
-float							g_fSpread = 400.0f;
-float							g_fStiffness = 100.0f;
-float							g_fDamping = -3.0f;
-float							g_fInvMass = 1.0f;
-
+extern float g_fSpread;
+extern float g_fStiffness;
+extern float g_fDamping;
+extern float g_fInvMass;
 
 #endif

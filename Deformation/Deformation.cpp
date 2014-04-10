@@ -81,9 +81,9 @@ ID3D11UnorderedAccessView*          g_pParticleArrayUAV1 = nullptr;
 ID3D11Buffer*                       g_pParticleBuffer = nullptr;
 ID3D11InputLayout*                  g_pParticleVertexLayout = nullptr;
 
-ID3D11Texture2D*					g_pModelTex[2];
-ID3D11RenderTargetView*				g_pModelRTV[2];
-ID3D11ShaderResourceView*			g_pModelSRV[2];
+ID3D11Texture2D*					g_pModelTex[2] = { nullptr, nullptr };
+ID3D11RenderTargetView*				g_pModelRTV[2] = { nullptr, nullptr };
+ID3D11ShaderResourceView*			g_pModelSRV[2] = { nullptr, nullptr };
 
 ID3D11Buffer*                       g_pcbGS = nullptr;
 

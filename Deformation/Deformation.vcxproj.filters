@@ -44,5 +44,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Deformable.cpp" />
+    <ClCompile Include="Constants.cpp" />
   </ItemGroup>
 </Project>
