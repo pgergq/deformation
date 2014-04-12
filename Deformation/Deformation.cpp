@@ -79,7 +79,6 @@ ID3D11ShaderResourceView*           g_pParticleArrayRV1 = nullptr;
 ID3D11UnorderedAccessView*          g_pParticleArrayUAV0 = nullptr;
 ID3D11UnorderedAccessView*          g_pParticleArrayUAV1 = nullptr;
 ID3D11Buffer*                       g_pParticleBuffer = nullptr;
-ID3D11InputLayout*                  g_pParticleVertexLayout = nullptr;
 
 ID3D11Texture2D*					g_pModelTex[2] = { nullptr, nullptr };
 ID3D11RenderTargetView*				g_pModelRTV[2] = { nullptr, nullptr };
@@ -743,6 +742,7 @@ HRESULT CreateParticlePosVeloBuffers(ID3D11Device* pd3dDevice)
 	// Desc for Particle buffers
 	D3D11_BUFFER_DESC desc;
 	ZeroMemory(&desc, sizeof(desc));
+	//*desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
 	desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
 	desc.ByteWidth = (g_nNumParticles + VOLCUBE1_COUNT + VOLCUBE2_COUNT) * sizeof(PARTICLE);
 	desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
@@ -1279,14 +1279,12 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	V_RETURN(pd3dDevice->CreateComputeShader(pBlobUpdateCS->GetBufferPointer(), pBlobUpdateCS->GetBufferSize(), nullptr, &g_pUdateCS));
 	DXUT_SetDebugName(g_pUdateCS, "PosUpdate");
 
-	// Create our vertex input layout
-	const D3D11_INPUT_ELEMENT_DESC layout[] =
-	{
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	};
-	V_RETURN(pd3dDevice->CreateInputLayout(layout, sizeof(layout) / sizeof(layout[0]),
-		pBlobRenderParticlesVS->GetBufferPointer(), pBlobRenderParticlesVS->GetBufferSize(), &g_pParticleVertexLayout));
-	DXUT_SetDebugName(g_pParticleVertexLayout, "Particles' layout");
+	//// No vertex buffer necessary, particle data is read from an SRV
+	pd3dImmediateContext->IASetInputLayout(nullptr);
+	ID3D11Buffer* pBuffers[1] = { nullptr };
+	UINT tmp[1] = { 0 };
+	pd3dImmediateContext->IASetVertexBuffers(0, 1, pBuffers, tmp, tmp);
+	pd3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
 
 	SAFE_RELEASE(pBlobRenderParticlesVS);
@@ -1484,14 +1482,14 @@ bool RenderModel(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
 	pd3dImmediateContext->GSSetShader(g_pRenderParticlesGS, nullptr, 0);
 	pd3dImmediateContext->PSSetShader(g_pModelPS1, nullptr, 0);
 
-	pd3dImmediateContext->IASetInputLayout(g_pParticleVertexLayout);
+	//pd3dImmediateContext->IASetInputLayout(g_pParticleVertexLayout);
 
-	// Set IA parameters
-	ID3D11Buffer* pBuffers[1] = { g_pParticleBuffer };
-	UINT stride[1] = { sizeof(PARTICLE_VERTEX) };
-	UINT offset[1] = { 0 };
-	pd3dImmediateContext->IASetVertexBuffers(0, 1, pBuffers, stride, offset);
-	pd3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+	//// Set IA parameters
+	//ID3D11Buffer* pBuffers[1] = { g_pParticleBuffer };
+	//UINT stride[1] = { sizeof(PARTICLE_VERTEX) };
+	//UINT offset[1] = { 0 };
+	//pd3dImmediateContext->IASetVertexBuffers(0, 1, pBuffers, stride, offset);
+	//pd3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
 	ID3D11ShaderResourceView* aRViews[1] = { g_pParticleArrayRV0 };
 	pd3dImmediateContext->VSSetShaderResources(0, 1, aRViews);
@@ -1554,14 +1552,14 @@ bool RenderParticles(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView,
 	pd3dImmediateContext->GSSetShader(g_pRenderParticlesGS, nullptr, 0);
 	pd3dImmediateContext->PSSetShader(g_pRenderParticlesPS, nullptr, 0);
 
-	pd3dImmediateContext->IASetInputLayout(g_pParticleVertexLayout);
+	//pd3dImmediateContext->IASetInputLayout(g_pParticleVertexLayout);
 
-	// Set IA parameters
-	ID3D11Buffer* pBuffers[1] = { g_pParticleBuffer };
-	UINT stride[1] = { sizeof(PARTICLE_VERTEX) };
-	UINT offset[1] = { 0 };
-	pd3dImmediateContext->IASetVertexBuffers(0, 1, pBuffers, stride, offset);
-	pd3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+	//// Set IA parameters
+	//ID3D11Buffer* pBuffers[1] = { g_pParticleBuffer };
+	//UINT stride[1] = { sizeof(PARTICLE_VERTEX) };
+	//UINT offset[1] = { 0 };
+	//pd3dImmediateContext->IASetVertexBuffers(0, 1, pBuffers, stride, offset);
+	//pd3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
 	ID3D11ShaderResourceView* aRViews[1] = { g_pParticleArrayRV0 };
 	pd3dImmediateContext->VSSetShaderResources(0, 1, aRViews);
@@ -1651,7 +1649,7 @@ void CALLBACK OnD3D11DestroyDevice(void* pUserContext)
 	DXUTGetGlobalResourceCache().OnDestroyDevice();
 	SAFE_DELETE(g_pTxtHelper);
 	SAFE_RELEASE(g_pParticleBuffer);
-	SAFE_RELEASE(g_pParticleVertexLayout);
+	//SAFE_RELEASE(g_pParticleVertexLayout);
 	SAFE_RELEASE(g_pParticleArray0);
 	SAFE_RELEASE(g_pParticleArray1);
 	SAFE_RELEASE(g_pIndexCube);

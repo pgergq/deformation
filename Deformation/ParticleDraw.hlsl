@@ -9,26 +9,19 @@
 //--------------------------------------------------------------------------------------
 
 
-struct VSParticleIn
+struct VSParticle
 {
-	float4  color   : COLOR;
-	uint    id      : SV_VertexID;
-};
-
-struct VSParticleDrawOut
-{
-	float3 pos			: POSITION;
-	float3 npos			: TEXCOORD3;
-	float3 mpid1		: TEXCOORD1;
-	float3 mpid2		: TEXCOORD2;
-	float4 color		: COLOR;
+	float4 pos			: WPOS;
+	float4 npos			: NPOS;
+	float4 mpid1		: MPID1;
+	float4 mpid2		: MPID2;
 };
 
 struct GSParticleDrawOut
 {
 	float2 tex			: TEXCOORD0;
-	float3 mpid1		: TEXCOORD1;
-	float3 mpid2		: TEXCOORD2;
+	float3 mpid1		: MPID1;
+	float3 mpid2		: MPID2;
 	float4 color		: COLOR;
 	float4 pos			: SV_Position;
 };
@@ -36,21 +29,13 @@ struct GSParticleDrawOut
 struct PSParticleDrawIn
 {
 	float2 tex			: TEXCOORD0;
-	float3 mpid1		: TEXCOORD1;
-	float3 mpid2		: TEXCOORD2;
+	float3 mpid1		: MPID1;
+	float3 mpid2		: MPID2;
 	float4 color		: COLOR;
 };
 
-struct Particle
-{
-	float4 pos			: SV_Position;
-	float4 npos			: TEXCOORD3;
-	float4 mpid1		: TEXCOORD1;
-	float4 mpid2		: TEXCOORD2;
-};
-
-Texture2D		            g_txDiffuse;
-StructuredBuffer<Particle>   g_bufParticle;
+Texture2D g_txDiffuse;
+StructuredBuffer<VSParticle> g_bufParticle;
 
 
 SamplerState g_samLinear
@@ -106,17 +91,14 @@ float4 PhongBlinn(float3 n, float3 h, float3 l){
 //
 // Vertex shader for drawing the point-sprite particles
 //
-VSParticleDrawOut VSParticleDraw(VSParticleIn input)
+VSParticle VSParticleDraw(uint id : SV_VertexID)
 {
-	VSParticleDrawOut output;
+	VSParticle output;
 
-	output.pos = g_bufParticle[input.id].pos.xyz;
-	output.npos = g_bufParticle[input.id].npos.xyz;
-	output.mpid1 = g_bufParticle[input.id].mpid1.xyz;
-	output.mpid2 = g_bufParticle[input.id].mpid2.xyz;
-
-	// load colour from Particle color
-	output.color = input.color;
+	output.pos = g_bufParticle[id].pos;
+	output.npos = g_bufParticle[id].npos;
+	output.mpid1 = g_bufParticle[id].mpid1;
+	output.mpid2 = g_bufParticle[id].mpid2;
 
 	return output;
 }
@@ -125,7 +107,7 @@ VSParticleDrawOut VSParticleDraw(VSParticleIn input)
 // GS for rendering point sprite particles.  Takes a point and turns it into 2 tris.
 //
 [maxvertexcount(4)]
-void GSParticleDraw(point VSParticleDrawOut input[1], inout TriangleStream<GSParticleDrawOut> SpriteStream)
+void GSParticleDraw(point VSParticle input[1], inout TriangleStream<GSParticleDrawOut> SpriteStream)
 {
 
 	GSParticleDrawOut output;
@@ -136,25 +118,20 @@ void GSParticleDraw(point VSParticleDrawOut input[1], inout TriangleStream<GSPar
 
 	for (int i = 0; i<4; i++)
 	{
-		//highlight green particles
-		float green = input[0].color.g;
-		if ((green - 0.9f) > 0) green = 2.5f;
-		else green = 1.0f;
 
 		//vertex -> two triangles
-		float3 position = g_positions[i] * g_fParticleRad * green;
+		float3 position = g_positions[i] * g_fParticleRad * 2.5f;
 		position = mul(position, (float3x3)g_mInvView) + input[0].pos;	// world position
 		output.pos = mul(float4(position, 1.0), g_mWorldViewProj);
 		
 		//shading
-		//original: output.color = input[0].color;
 		float3 v = normalize(eyepos.xyz - input[0].pos.xyz);
 		float3 h = normalize(v + l);
 		if (any(input[0].npos.xyz)){								// not null vector normal = model vertices
 			output.color = PhongBlinn(n, h, l);
 		}
 		else{														// null normal -> other vertices
-			output.color = input[0].color;
+			output.color = float4(1,0,0,0);
 		}
 
 		//texture and vertex IDs
