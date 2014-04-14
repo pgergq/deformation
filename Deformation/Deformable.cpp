@@ -15,6 +15,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include "DXUT.h"
 
 
 //--------------------------------------------------------------------------------------
@@ -23,11 +24,21 @@
 Deformable::Deformable(std::string x){
 
 	this->file = x;		// file must be .obj formatted, with equal number of vertices and vertex normals (plus optional face data)
+
+}
+
+//--------------------------------------------------------------------------------------
+// Init (A) Initialize all components
+//--------------------------------------------------------------------------------------
+void Deformable::build(){
+
 	this->importFile();
 	this->initVars();
+	this->initParticles();
 	this->initMasscubes();
 	this->initIndexer();
 	this->initNeighbouring();
+
 }
 
 //--------------------------------------------------------------------------------------
@@ -218,12 +229,14 @@ void Deformable::initIndexer(){
 
 	for (int i = 0; i < this->vertexCount; i++)
 	{
+		INDEXER push;
+		
 		// Get indices and weights in first volumetric cube
 		vertex = XMFLOAT3(this->particles[i].pos.x, this->particles[i].pos.y, this->particles[i].pos.z);
 		int x = (std::max(vertex.x, vc_pos1.x) - std::min(vertex.x, vc_pos1.x)) / this->cubeCellSize;
 		int y = (std::max(vertex.y, vc_pos1.y) - std::min(vertex.y, vc_pos1.y)) / this->cubeCellSize;
 		int z = (std::max(vertex.z, vc_pos1.z) - std::min(vertex.z, vc_pos1.z)) / this->cubeCellSize;
-		XMStoreFloat3(&this->indexcube[i].vc1index, XMVectorSet(x, y, z, 0));
+		XMStoreFloat3(&push.vc1index, XMVectorSet(x, y, z, 0));
 		XMStoreFloat4(&this->particles[i].mpid1, XMVectorSet(x, y, z, 1));
 
 		// trilinear interpolation
@@ -234,8 +247,8 @@ void Deformable::initIndexer(){
 		float dwy = 1.0f - wy;
 		float wz = (vertex.z - this->masscube1[vind].newpos.z) / this->cubeCellSize;
 		float dwz = 1.0f - wz;
-		this->indexcube[i].w1[0] = dwx*dwy*dwz; this->indexcube[i].w1[1] = wx*dwy*dwz; this->indexcube[i].w1[2] = dwx*wy*dwz; this->indexcube[i].w1[3] = wx*wy*dwz;
-		this->indexcube[i].w1[4] = dwx*dwy*wz; this->indexcube[i].w1[5] = wx*dwy*wz; this->indexcube[i].w1[6] = dwx*wy*wz; this->indexcube[i].w1[7] = wx*wy*wz;
+		push.w1[0] = dwx*dwy*dwz; push.w1[1] = wx*dwy*dwz; push.w1[2] = dwx*wy*dwz; push.w1[3] = wx*wy*dwz;
+		push.w1[4] = dwx*dwy*wz; push.w1[5] = wx*dwy*wz; push.w1[6] = dwx*wy*wz; push.w1[7] = wx*wy*wz;
 
 		// trilinear for npos
 		vertex = XMFLOAT3(this->particles[i].npos.x, this->particles[i].npos.y, this->particles[i].npos.z);
@@ -245,8 +258,8 @@ void Deformable::initIndexer(){
 		dwy = 1.0f - wy;
 		wz = (vertex.z - this->masscube1[vind].newpos.z) / this->cubeCellSize;
 		dwz = 1.0f - wz;
-		this->indexcube[i].nw1[0] = dwx*dwy*dwz; this->indexcube[i].nw1[1] = wx*dwy*dwz; this->indexcube[i].nw1[2] = dwx*wy*dwz; this->indexcube[i].nw1[3] = wx*wy*dwz;
-		this->indexcube[i].nw1[4] = dwx*dwy*wz; this->indexcube[i].nw1[5] = wx*dwy*wz; this->indexcube[i].nw1[6] = dwx*wy*wz; this->indexcube[i].nw1[7] = wx*wy*wz;
+		push.nw1[0] = dwx*dwy*dwz; push.nw1[1] = wx*dwy*dwz; push.nw1[2] = dwx*wy*dwz; push.nw1[3] = wx*wy*dwz;
+		push.nw1[4] = dwx*dwy*wz; push.nw1[5] = wx*dwy*wz; push.nw1[6] = dwx*wy*wz; push.nw1[7] = wx*wy*wz;
 
 
 		// Fill second indexer
@@ -254,7 +267,7 @@ void Deformable::initIndexer(){
 		x = (std::max(vertex.x, vc_pos2.x) - std::min(vertex.x, vc_pos2.x)) / this->cubeCellSize;
 		y = (std::max(vertex.y, vc_pos2.y) - std::min(vertex.y, vc_pos2.y)) / this->cubeCellSize;
 		z = (std::max(vertex.z, vc_pos2.z) - std::min(vertex.z, vc_pos2.z)) / this->cubeCellSize;
-		XMStoreFloat3(&this->indexcube[i].vc2index, XMVectorSet(x, y, z, 0));
+		XMStoreFloat3(&push.vc2index, XMVectorSet(x, y, z, 0));
 		XMStoreFloat4(&this->particles[i].mpid2, XMVectorSet(x, y, z, 1));
 
 		vind = z*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1) + y*(VCUBEWIDTH + 1) + x;
@@ -264,8 +277,8 @@ void Deformable::initIndexer(){
 		dwy = 1.0f - wy;
 		wz = (vertex.z - this->masscube2[vind].newpos.z) / this->cubeCellSize;
 		dwz = 1.0f - wz;
-		this->indexcube[i].w2[0] = dwx*dwy*dwz; this->indexcube[i].w2[1] = wx*dwy*dwz; this->indexcube[i].w2[2] = dwx*wy*dwz; this->indexcube[i].w2[3] = wx*wy*dwz;
-		this->indexcube[i].w2[4] = dwx*dwy*wz; this->indexcube[i].w2[5] = wx*dwy*wz; this->indexcube[i].w2[6] = dwx*wy*wz; this->indexcube[i].w2[7] = wx*wy*wz;
+		push.w2[0] = dwx*dwy*dwz; push.w2[1] = wx*dwy*dwz; push.w2[2] = dwx*wy*dwz; push.w2[3] = wx*wy*dwz;
+		push.w2[4] = dwx*dwy*wz; push.w2[5] = wx*dwy*wz; push.w2[6] = dwx*wy*wz; push.w2[7] = wx*wy*wz;
 
 		vertex = XMFLOAT3(this->particles[i].npos.x, this->particles[i].npos.y, this->particles[i].npos.z);
 		wx = (vertex.x - this->masscube2[vind].newpos.x) / this->cubeCellSize;
@@ -274,9 +287,10 @@ void Deformable::initIndexer(){
 		dwy = 1.0f - wy;
 		wz = (vertex.z - this->masscube2[vind].newpos.z) / this->cubeCellSize;
 		dwz = 1.0f - wz;
-		this->indexcube[i].nw2[0] = dwx*dwy*dwz; this->indexcube[i].nw2[1] = wx*dwy*dwz; this->indexcube[i].nw2[2] = dwx*wy*dwz; this->indexcube[i].nw2[3] = wx*wy*dwz;
-		this->indexcube[i].nw2[4] = dwx*dwy*wz; this->indexcube[i].nw2[5] = wx*dwy*wz; this->indexcube[i].nw2[6] = dwx*wy*wz; this->indexcube[i].nw2[7] = wx*wy*wz;
+		push.nw2[0] = dwx*dwy*dwz; push.nw2[1] = wx*dwy*dwz; push.nw2[2] = dwx*wy*dwz; push.nw2[3] = wx*wy*dwz;
+		push.nw2[4] = dwx*dwy*wz; push.nw2[5] = wx*dwy*wz; push.nw2[6] = dwx*wy*wz; push.nw2[7] = wx*wy*wz;
 
+		indexcube.push_back(push);
 	}
 }
 

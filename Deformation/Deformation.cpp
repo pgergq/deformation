@@ -88,6 +88,7 @@ ID3D11Buffer*                       g_pcbGS = nullptr;
 
 ID3D11ShaderResourceView*           g_pParticleTexRV = nullptr;
 
+std::vector<Deformable>				deformableObjects;				// scene objects
 
 int									g_nWindowWidth = 800;
 int									g_nWindowHeight = 600;
@@ -171,9 +172,7 @@ void CALLBACK OnD3D11DestroyDevice(void* pUserContext);
 void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext);
 
 void InitApp();
-void RenderText();
-void ModelRenderBuffers(ID3D11Device*, int, int);
-bool RenderModel(ID3D11DeviceContext*, CXMMATRIX, CXMMATRIX);
+//bool drawPicking(ID3D11DeviceContext*, CXMMATRIX, CXMMATRIX);
 void LoadModel(PARTICLE*);
 void LoadVolumetricCubes(MASSPOINT*, MASSPOINT*, PARTICLE*);
 void print_debug(const char*);
@@ -287,7 +286,7 @@ HRESULT CreateParticleBuffer(ID3D11Device* pd3dDevice)
 //--------------------------------------------------------------------------------------
 // Load model file, set global volcube parameters
 //-------------------------------------------------------------------------------------
-void ReadModel()
+HRESULT ReadModel()
 {
 
 	// Import file
@@ -370,6 +369,7 @@ void ReadModel()
 	// Set model vertex count
 	g_nNumParticles = g_vVertices.size();
 
+	return S_OK;
 }
 
 //--------------------------------------------------------------------------------------
@@ -765,7 +765,7 @@ HRESULT CreateParticlePosVeloBuffers(ID3D11Device* pd3dDevice)
 	if (!pData1 || !vData1 || !vData2)
 		return E_OUTOFMEMORY;
 
-	/// Load Particle cube, load Volumetric cubes
+	// Load Particle cube, load Volumetric cubes
 	LoadModel(pData1);
 	LoadVolumetricCubes(vData1, vData2, pData1);
 
@@ -1202,39 +1202,39 @@ bool CALLBACK IsD3D11DeviceAcceptable(const CD3D11EnumAdapterInfo *AdapterInfo, 
 	return true;
 }
 
+
 //--------------------------------------------------------------------------------------
-// Create any D3D11 resources that aren't dependant on the back buffer
+// Init shaders, set vertex buffer
 //--------------------------------------------------------------------------------------
-HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFACE_DESC* pBackBufferSurfaceDesc,
-	void* pUserContext)
-{
+HRESULT importFiles(){
+
+	OutputDebugString(L"import:\n");
+	// set up first bunny
+	Deformable body1("bunny_res3_scaled.obj");
+	OutputDebugString(L"constr.\n");
+	body1.cubePos = XMFLOAT3(100, 100, 100);
+	OutputDebugString(L"set1.\n");
+	body1.build();
+	OutputDebugString(L"build1.\n");
+	deformableObjects.push_back(body1);
+	OutputDebugString(L"push1.\n");
+
+	//set up second bunny
+	Deformable body2("bunny_res3_scaled.obj");
+	body2.cubePos = XMFLOAT3(400, 100, 100);
+	body2.build();
+	deformableObjects.push_back(body2);
+
+	return S_OK;
+}
+
+
+//--------------------------------------------------------------------------------------
+// Init shaders, set vertex buffer
+//--------------------------------------------------------------------------------------
+HRESULT initShaders(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext){
 
 	HRESULT hr;
-
-	static bool bFirstOnCreateDevice = true;
-
-	// Warn the user that in order to support CS4x, a non-hardware device has been created, continue or quit?
-	if (DXUTGetDeviceSettings().d3d11.DriverType != D3D_DRIVER_TYPE_HARDWARE && bFirstOnCreateDevice)
-	{
-		if (MessageBox(0, L"CS4x capability is missing. "\
-			L"In order to continue, a non-hardware device has been created, "\
-			L"it will be very slow, continue?", L"Warning", MB_ICONEXCLAMATION | MB_YESNO) != IDYES)
-			return E_FAIL;
-	}
-
-	CWaitDlg CompilingShadersDlg;
-	CompilingShadersDlg.ShowDialog(L"Compiling Shaders...");
-
-	bFirstOnCreateDevice = false;
-
-	D3D11_FEATURE_DATA_D3D10_X_HARDWARE_OPTIONS ho;
-	V_RETURN(pd3dDevice->CheckFeatureSupport(D3D11_FEATURE_D3D10_X_HARDWARE_OPTIONS, &ho, sizeof(ho)));
-
-	auto pd3dImmediateContext = DXUTGetD3D11DeviceContext();
-	V_RETURN(g_DialogResourceManager.OnD3D11CreateDevice(pd3dDevice, pd3dImmediateContext));
-	V_RETURN(g_D3DSettingsDlg.OnD3D11CreateDevice(pd3dDevice));
-	g_pTxtHelper = new CDXUTTextHelper(pd3dDevice, pd3dImmediateContext, &g_DialogResourceManager, 15);
-
 	ID3DBlob* pBlobRenderParticlesVS = nullptr;
 	ID3DBlob* pBlobRenderParticlesGS = nullptr;
 	ID3DBlob* pBlobRenderParticlesPS = nullptr;
@@ -1244,7 +1244,7 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	ID3DBlob* pBlobCalc2CS = nullptr;
 	ID3DBlob* pBlobUpdateCS = nullptr;
 
-	// Create the shaders
+	// Compile shaders
 	V_RETURN(DXUTCompileFromFile(L"ParticleDraw.hlsl", nullptr, "VSParticleDraw", "vs_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobRenderParticlesVS));
 	V_RETURN(DXUTCompileFromFile(L"ParticleDraw.hlsl", nullptr, "GSParticleDraw", "gs_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobRenderParticlesGS));
 	V_RETURN(DXUTCompileFromFile(L"ParticleDraw.hlsl", nullptr, "PSParticleDraw", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobRenderParticlesPS));
@@ -1279,14 +1279,14 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	V_RETURN(pd3dDevice->CreateComputeShader(pBlobUpdateCS->GetBufferPointer(), pBlobUpdateCS->GetBufferSize(), nullptr, &g_pUdateCS));
 	DXUT_SetDebugName(g_pUdateCS, "PosUpdate");
 
-	//// No vertex buffer necessary, particle data is read from an SRV
+	// No vertex buffer necessary, particle data is read from an SRV
 	pd3dImmediateContext->IASetInputLayout(nullptr);
 	ID3D11Buffer* pBuffers[1] = { nullptr };
 	UINT tmp[1] = { 0 };
 	pd3dImmediateContext->IASetVertexBuffers(0, 1, pBuffers, tmp, tmp);
 	pd3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
-
+	// Release blobs
 	SAFE_RELEASE(pBlobRenderParticlesVS);
 	SAFE_RELEASE(pBlobRenderParticlesGS);
 	SAFE_RELEASE(pBlobRenderParticlesPS);
@@ -1296,13 +1296,17 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	SAFE_RELEASE(pBlobCalc2CS);
 	SAFE_RELEASE(pBlobUpdateCS);
 
-	// Read model file, set global volcube parameters
-	ReadModel();
-	ModelRenderBuffers(pd3dDevice, 800, 600);
-	V_RETURN(CreateParticleBuffer(pd3dDevice));
-	V_RETURN(CreateParticlePosVeloBuffers(pd3dDevice));
+	return S_OK;
+}
 
-	// Setup constant buffer
+//--------------------------------------------------------------------------------------
+// Init depthstencil, blend, constant buffers, texture
+//--------------------------------------------------------------------------------------
+HRESULT initRender(ID3D11Device* pd3dDevice){
+
+	HRESULT hr;
+	
+	// Setup constant buffers
 	D3D11_BUFFER_DESC Desc;
 	Desc.Usage = D3D11_USAGE_DYNAMIC;
 	Desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -1316,10 +1320,11 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	V_RETURN(pd3dDevice->CreateBuffer(&Desc, nullptr, &g_pcbCS));
 	DXUT_SetDebugName(g_pcbCS, "CB_CS");
 
-	// Load the Particle Texture
+	// Load Particle Texture
 	V_RETURN(DXUTCreateShaderResourceViewFromFile(pd3dDevice, L"misc\\Particle.dds", &g_pParticleTexRV));
 	DXUT_SetDebugName(g_pParticleTexRV, "Particle.dds");
 
+	// Create sampler
 	D3D11_SAMPLER_DESC SamplerDesc;
 	ZeroMemory(&SamplerDesc, sizeof(SamplerDesc));
 	SamplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -1329,6 +1334,7 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	V_RETURN(pd3dDevice->CreateSamplerState(&SamplerDesc, &g_pSampleStateLinear));
 	DXUT_SetDebugName(g_pSampleStateLinear, "Linear");
 
+	// Create blend
 	D3D11_BLEND_DESC BlendStateDesc;
 	ZeroMemory(&BlendStateDesc, sizeof(BlendStateDesc));
 	BlendStateDesc.RenderTarget[0].BlendEnable = TRUE;
@@ -1342,6 +1348,7 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	V_RETURN(pd3dDevice->CreateBlendState(&BlendStateDesc, &g_pBlendingStateParticle));
 	DXUT_SetDebugName(g_pBlendingStateParticle, "Blending");
 
+	// Create depth stencil
 	D3D11_DEPTH_STENCIL_DESC DepthStencilDesc;
 	ZeroMemory(&DepthStencilDesc, sizeof(DepthStencilDesc));
 	DepthStencilDesc.DepthEnable = FALSE;
@@ -1349,66 +1356,13 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 	pd3dDevice->CreateDepthStencilState(&DepthStencilDesc, &g_pDepthStencilState);
 	DXUT_SetDebugName(g_pDepthStencilState, "DepthOff");
 
-	// Setup the camera's view parameters
-	XMVECTOR vecEye = XMVectorSet(-g_fSpread * 0, g_fSpread * 0, -g_fSpread * 27, 0.0f);
-	XMVECTOR vecAt = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
-	g_Camera.SetViewParams(vecEye, vecAt);
-
-	CompilingShadersDlg.DestroyDialog();
-
 	return S_OK;
 }
-
-HRESULT CALLBACK OnD3D11ResizedSwapChain(ID3D11Device* pd3dDevice, IDXGISwapChain* pSwapChain,
-	const DXGI_SURFACE_DESC* pBackBufferSurfaceDesc, void* pUserContext)
-{
-
-	HRESULT hr = S_OK;
-
-	V_RETURN(g_DialogResourceManager.OnD3D11ResizedSwapChain(pd3dDevice, pBackBufferSurfaceDesc));
-	V_RETURN(g_D3DSettingsDlg.OnD3D11ResizedSwapChain(pd3dDevice, pBackBufferSurfaceDesc));
-
-	// Setup the camera's projection parameters
-	g_nWindowWidth = pBackBufferSurfaceDesc->Width;
-	g_nWindowHeight = pBackBufferSurfaceDesc->Height;
-	float fAspectRatio = pBackBufferSurfaceDesc->Width / (FLOAT)pBackBufferSurfaceDesc->Height;
-	g_Camera.SetProjParams(XM_PI / 4, fAspectRatio, 10.0f, 500000.0f);
-	g_Camera.SetWindow(pBackBufferSurfaceDesc->Width, pBackBufferSurfaceDesc->Height);
-	g_Camera.SetButtonMasks(0, MOUSE_WHEEL, MOUSE_LEFT_BUTTON | MOUSE_MIDDLE_BUTTON);
-
-	g_HUD.SetLocation(pBackBufferSurfaceDesc->Width - 170, 0);
-	g_HUD.SetSize(170, 170);
-	g_SampleUI.SetLocation(pBackBufferSurfaceDesc->Width - 170, pBackBufferSurfaceDesc->Height - 300);
-	g_SampleUI.SetSize(170, 300);
-
-	ModelRenderBuffers(pd3dDevice, pBackBufferSurfaceDesc->Width, pBackBufferSurfaceDesc->Height);
-
-	return hr;
-}
-
-void CALLBACK OnD3D11ReleasingSwapChain(void* pUserContext)
-{
-	g_DialogResourceManager.OnD3D11ReleasingSwapChain();
-}
-
-void RenderText()
-{
-	g_pTxtHelper->Begin();
-	g_pTxtHelper->SetInsertionPos(2, 0);
-	g_pTxtHelper->SetForegroundColor(Colors::DarkTurquoise);
-	g_pTxtHelper->DrawTextLine(DXUTGetFrameStats(DXUTIsVsyncEnabled()));
-	g_pTxtHelper->DrawTextLine(DXUTGetDeviceStats());
-	g_pTxtHelper->DrawTextLine(L"[Project Deformation v0.9]");
-	std::wstring s = L"#particle: " + std::to_wstring(g_nNumParticles) + L", #masspoint: " + std::to_wstring(VOLCUBE1_COUNT + VOLCUBE2_COUNT) + L", stiff: " + std::to_wstring(g_fStiffness) + L", damp: " + std::to_wstring(g_fDamping);
-	g_pTxtHelper->DrawTextLine(s.c_str());
-	g_pTxtHelper->End();
-}
-
 
 //--------------------------------------------------------------------------------------
 // (Re)Create texture and buffers for model render target (for picking)
 //--------------------------------------------------------------------------------------
-void ModelRenderBuffers(ID3D11Device* pd3dDevice, int width, int height)
+HRESULT initPicking(ID3D11Device* pd3dDevice, int width, int height)
 {
 
 	SAFE_RELEASE(g_pModelTex[0]);
@@ -1456,13 +1410,114 @@ void ModelRenderBuffers(ID3D11Device* pd3dDevice, int width, int height)
 	pd3dDevice->CreateShaderResourceView(g_pModelTex[1], &srvdesc, &g_pModelSRV[1]);
 	DXUT_SetDebugName(g_pModelSRV[1], "Model SRV 2");
 
+	return S_OK;
+}
+
+//--------------------------------------------------------------------------------------
+// Create any D3D11 resources that aren't dependant on the back buffer
+//--------------------------------------------------------------------------------------
+HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFACE_DESC* pBackBufferSurfaceDesc,
+	void* pUserContext)
+{
+
+	HRESULT hr;
+
+	static bool bFirstOnCreateDevice = true;
+
+	// Warn the user that in order to support CS4x, a non-hardware device has been created, continue or quit?
+	if (DXUTGetDeviceSettings().d3d11.DriverType != D3D_DRIVER_TYPE_HARDWARE && bFirstOnCreateDevice)
+	{
+		if (MessageBox(0, L"CS4x capability is missing. "\
+			L"In order to continue, a non-hardware device has been created, "\
+			L"it will be very slow, continue?", L"Warning", MB_ICONEXCLAMATION | MB_YESNO) != IDYES)
+			return E_FAIL;
+	}
+
+	CWaitDlg CompilingShadersDlg;
+	CompilingShadersDlg.ShowDialog(L"Compiling Shaders...");
+
+	bFirstOnCreateDevice = false;
+
+	D3D11_FEATURE_DATA_D3D10_X_HARDWARE_OPTIONS ho;
+	V_RETURN(pd3dDevice->CheckFeatureSupport(D3D11_FEATURE_D3D10_X_HARDWARE_OPTIONS, &ho, sizeof(ho)));
+
+	auto pd3dImmediateContext = DXUTGetD3D11DeviceContext();
+	V_RETURN(g_DialogResourceManager.OnD3D11CreateDevice(pd3dDevice, pd3dImmediateContext));
+	V_RETURN(g_D3DSettingsDlg.OnD3D11CreateDevice(pd3dDevice));
+	g_pTxtHelper = new CDXUTTextHelper(pd3dDevice, pd3dImmediateContext, &g_DialogResourceManager, 15);
+
+	// Create and compile shaders, init vertex buffer
+	V_RETURN(initShaders(pd3dDevice, pd3dImmediateContext));
+
+	// Import objects from files, set up deformable objects
+	V_RETURN(importFiles());
+
+	// Read model file, set global volcube parameters //***
+	V_RETURN(ReadModel());
+
+	// Create textures&buffers for picking
+	V_RETURN(initPicking(pd3dDevice, 800, 600));
+
+	//***
+	V_RETURN(CreateParticleBuffer(pd3dDevice));
+	V_RETURN(CreateParticlePosVeloBuffers(pd3dDevice));
+
+	// Init depth stencil, blend, texture, constant buffers
+	V_RETURN(initRender(pd3dDevice));
+
+	// Setup the camera's view parameters
+	XMVECTOR vecEye = XMVectorSet(-g_fSpread * 0, g_fSpread * 0, -g_fSpread * 27, 0.0f);
+	XMVECTOR vecAt = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+	g_Camera.SetViewParams(vecEye, vecAt);
+
+	CompilingShadersDlg.DestroyDialog();
+
+	return S_OK;
+}
+
+//--------------------------------------------------------------------------------------
+// On screen resize
+//--------------------------------------------------------------------------------------
+HRESULT CALLBACK OnD3D11ResizedSwapChain(ID3D11Device* pd3dDevice, IDXGISwapChain* pSwapChain,
+	const DXGI_SURFACE_DESC* pBackBufferSurfaceDesc, void* pUserContext)
+{
+
+	HRESULT hr = S_OK;
+
+	V_RETURN(g_DialogResourceManager.OnD3D11ResizedSwapChain(pd3dDevice, pBackBufferSurfaceDesc));
+	V_RETURN(g_D3DSettingsDlg.OnD3D11ResizedSwapChain(pd3dDevice, pBackBufferSurfaceDesc));
+
+	// Setup the camera's projection parameters
+	g_nWindowWidth = pBackBufferSurfaceDesc->Width;
+	g_nWindowHeight = pBackBufferSurfaceDesc->Height;
+	float fAspectRatio = pBackBufferSurfaceDesc->Width / (FLOAT)pBackBufferSurfaceDesc->Height;
+	g_Camera.SetProjParams(XM_PI / 4, fAspectRatio, 10.0f, 500000.0f);
+	g_Camera.SetWindow(pBackBufferSurfaceDesc->Width, pBackBufferSurfaceDesc->Height);
+	g_Camera.SetButtonMasks(0, MOUSE_WHEEL, MOUSE_LEFT_BUTTON | MOUSE_MIDDLE_BUTTON);
+
+	g_HUD.SetLocation(pBackBufferSurfaceDesc->Width - 170, 0);
+	g_HUD.SetSize(170, 170);
+	g_SampleUI.SetLocation(pBackBufferSurfaceDesc->Width - 170, pBackBufferSurfaceDesc->Height - 300);
+	g_SampleUI.SetSize(170, 300);
+
+	initPicking(pd3dDevice, pBackBufferSurfaceDesc->Width, pBackBufferSurfaceDesc->Height);
+
+	return hr;
+}
+
+//--------------------------------------------------------------------------------------
+// On swap-chain release
+//--------------------------------------------------------------------------------------
+void CALLBACK OnD3D11ReleasingSwapChain(void* pUserContext)
+{
+	g_DialogResourceManager.OnD3D11ReleasingSwapChain();
 }
 
 
 //--------------------------------------------------------------------------------------
 // Render model to texture, for picking / dragging
 //--------------------------------------------------------------------------------------
-bool RenderModel(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXMMATRIX mProj)
+bool drawPicking(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXMMATRIX mProj)
 {
 
 	ID3D11RenderTargetView* pRTV = DXUTGetD3D11RenderTargetView();
@@ -1481,15 +1536,6 @@ bool RenderModel(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
 	pd3dImmediateContext->VSSetShader(g_pRenderParticlesVS, nullptr, 0);
 	pd3dImmediateContext->GSSetShader(g_pRenderParticlesGS, nullptr, 0);
 	pd3dImmediateContext->PSSetShader(g_pModelPS1, nullptr, 0);
-
-	//pd3dImmediateContext->IASetInputLayout(g_pParticleVertexLayout);
-
-	//// Set IA parameters
-	//ID3D11Buffer* pBuffers[1] = { g_pParticleBuffer };
-	//UINT stride[1] = { sizeof(PARTICLE_VERTEX) };
-	//UINT offset[1] = { 0 };
-	//pd3dImmediateContext->IASetVertexBuffers(0, 1, pBuffers, stride, offset);
-	//pd3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
 	ID3D11ShaderResourceView* aRViews[1] = { g_pParticleArrayRV0 };
 	pd3dImmediateContext->VSSetShaderResources(0, 1, aRViews);
@@ -1537,9 +1583,9 @@ bool RenderModel(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
 }
 
 //--------------------------------------------------------------------------------------
-// Render model to display
+// Render objects to display
 //--------------------------------------------------------------------------------------
-bool RenderParticles(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXMMATRIX mProj)
+bool drawObjects(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXMMATRIX mProj)
 {
 	ID3D11BlendState *pBlendState0 = nullptr;
 	ID3D11DepthStencilState *pDepthStencilState0 = nullptr;
@@ -1551,15 +1597,6 @@ bool RenderParticles(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView,
 	pd3dImmediateContext->VSSetShader(g_pRenderParticlesVS, nullptr, 0);
 	pd3dImmediateContext->GSSetShader(g_pRenderParticlesGS, nullptr, 0);
 	pd3dImmediateContext->PSSetShader(g_pRenderParticlesPS, nullptr, 0);
-
-	//pd3dImmediateContext->IASetInputLayout(g_pParticleVertexLayout);
-
-	//// Set IA parameters
-	//ID3D11Buffer* pBuffers[1] = { g_pParticleBuffer };
-	//UINT stride[1] = { sizeof(PARTICLE_VERTEX) };
-	//UINT offset[1] = { 0 };
-	//pd3dImmediateContext->IASetVertexBuffers(0, 1, pBuffers, stride, offset);
-	//pd3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
 	ID3D11ShaderResourceView* aRViews[1] = { g_pParticleArrayRV0 };
 	pd3dImmediateContext->VSSetShaderResources(0, 1, aRViews);
@@ -1594,6 +1631,9 @@ bool RenderParticles(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView,
 	return true;
 }
 
+//--------------------------------------------------------------------------------------
+// Render next frame
+//--------------------------------------------------------------------------------------
 void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime,
 	float fElapsedTime, void* pUserContext)
 {
@@ -1615,18 +1655,12 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 
 	// Render the model first for picking, only if RMBUTTONDOWN happened
 	if (g_bRM2Texture){
-		//ModelRenderBuffers(pd3dDevice,g_nWindowWidth,g_nWindowHeight);
-		RenderModel(pd3dImmediateContext, mView, mProj);
+		//initPicking(pd3dDevice,g_nWindowWidth,g_nWindowHeight);
+		drawPicking(pd3dImmediateContext, mView, mProj);
 	}
 
 	// Render the particles
-	RenderParticles(pd3dImmediateContext, mView, mProj);
-
-	////DXUT_BeginPerfEvent( DXUT_PERFEVENTCOLOR, L"HUD / Stats" );
-	//g_HUD.OnRender(fElapsedTime);
-	//g_SampleUI.OnRender(fElapsedTime);
-	//RenderText();
-	////DXUT_EndPerfEvent();
+	drawObjects(pd3dImmediateContext, mView, mProj);
 
 	// The following could be used to output fps stats into debug output window,
 	// which is useful because you can then turn off all UI rendering as they cloud performance
@@ -1649,7 +1683,6 @@ void CALLBACK OnD3D11DestroyDevice(void* pUserContext)
 	DXUTGetGlobalResourceCache().OnDestroyDevice();
 	SAFE_DELETE(g_pTxtHelper);
 	SAFE_RELEASE(g_pParticleBuffer);
-	//SAFE_RELEASE(g_pParticleVertexLayout);
 	SAFE_RELEASE(g_pParticleArray0);
 	SAFE_RELEASE(g_pParticleArray1);
 	SAFE_RELEASE(g_pIndexCube);
