@@ -75,18 +75,15 @@ float3 acceleration(MassPoint a, MassPoint b, uint mode)
 	float len;
 	// 0 == same cube, 1 == other cube, 2 == same cube+second neighbour
 	switch (mode){
-	case 0: len = vccell; break;
-	case 1: len = vccell * 0.5f * sqrt(3); break;
-	case 2: len = vccell * 2; break;
-	default: break;
+        case 0: len = vccell; break;
+        case 1: len = vccell * 0.5f * sqrt(3); break;
+        case 2: len = vccell * 2; break;
+        default: break;
 	}
 
 	// F(stiff) = ks * (xj-xi)/|xj-xi| * (|xj-xi| - l0)
 	// F(damp) = kd * (vj-vi) * (xj-xi)/|xj-xi|
 	// return F/m
-	//if (mode == 2 && (length(a.newpos - b.newpos) - len) > 0)	//if mode==2 and the two vertices are parting -> do not apply contraction force, only 'stiffening' force
-	//	return float3(0, 0, 0);
-	//else
 	return (stiffness * normalize(b.newpos - a.newpos) * (length(a.newpos - b.newpos) - len) + damping * v) * im;
 }
 
@@ -98,7 +95,7 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 	uint z = Gid.z; uint y = Gid.y; uint x = Gid.x;
 	uint ind = z*vcwidth*vcwidth + y*vcwidth + x;
 	uint ind2 = z*(vcwidth + 1)*(vcwidth + 1) + y*(vcwidth + 1) + x;
-	uint max = vcwidth*vcwidth*vcwidth;
+	//uint max = vcwidth*vcwidth*vcwidth;
 
 	/// Picking
 	float4 pickID = vertexID1[uint2(pickOriginX, pickOriginY)];				// ID of picked masscube's lower left masspoint
@@ -107,12 +104,12 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 			float len = length(ovolcube1[ind].newpos.xyz - eyePos.xyz);			// current
 			float3 v_curr = pickDir * len + eyePos.xyz;							// current position
 
-				volcube1[ind].acc.xyz = float3(0, 0, 0);
+			volcube1[ind].acc.xyz = float3(0, 0, 0);
 			volcube1[ind].oldpos = ovolcube1[ind].newpos;
 			volcube1[ind].newpos.xyz = v_curr;
-
-			/// Normal mode
 		}
+
+        /// Normal mode
 		else {
 
 			uint same = ovolcube1[ind].neighbour_same;
@@ -122,13 +119,13 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 			/// Sum neighbouring forces
 			float3 accel = float3(0, notstaticmass*gravity*im, 0);		// gravity
 
-				// Get neighbours, set acceleration, with index checking
-				// neighbours in the same volcube + second neighbours
-				if (same & NB_SAME_LEFT){				// left neighbour
-					accel += acceleration(ovolcube1[ind], ovolcube1[ind - 1], 0);
-					if (x > 1 && (ovolcube1[ind - 1].neighbour_same & NB_SAME_LEFT))				//second to left
-						accel += acceleration(ovolcube1[ind], ovolcube1[ind - 2], 2);
-				}
+			// Get neighbours, set acceleration, with index checking
+			// neighbours in the same volcube + second neighbours
+			if (same & NB_SAME_LEFT){				// left neighbour
+				accel += acceleration(ovolcube1[ind], ovolcube1[ind - 1], 0);
+				if (x > 1 && (ovolcube1[ind - 1].neighbour_same & NB_SAME_LEFT))				//second to left
+					accel += acceleration(ovolcube1[ind], ovolcube1[ind - 2], 2);
+			}
 			if (same & NB_SAME_RIGHT){				// right neighbour 
 				accel += acceleration(ovolcube1[ind], ovolcube1[ind + 1], 0);
 				if (x < vcwidth - 2 && (ovolcube1[ind + 1].neighbour_same & NB_SAME_RIGHT))		//second to right
@@ -175,14 +172,12 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 
 
 			//Verlet + Acceleration
-			if (ind < max){
-				if (ovolcube1[ind].newpos.y < tablepos && notstaticmass){				// table
-					accel += float3(0, min(exp_max, 1000 * exp2(-ovolcube1[ind].newpos.y)*exp_mul), 0);
-				}
-				volcube1[ind].acc.xyz = accel;
-				volcube1[ind].oldpos = ovolcube1[ind].newpos;
-				volcube1[ind].newpos.xyz = ovolcube1[ind].newpos.xyz * 2 - ovolcube1[ind].oldpos.xyz + accel*dt*dt;
+			if (ovolcube1[ind].newpos.y < tablepos && notstaticmass){				// table
+				accel += float3(0, min(exp_max, 1000 * exp2(-ovolcube1[ind].newpos.y)*exp_mul), 0);
 			}
+			volcube1[ind].acc.xyz = accel;
+			volcube1[ind].oldpos = ovolcube1[ind].newpos;
+			volcube1[ind].newpos.xyz = ovolcube1[ind].newpos.xyz * 2 - ovolcube1[ind].oldpos.xyz + accel*dt*dt;
 		}
 }
 
@@ -193,10 +188,9 @@ void CSMain2(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 	uint z = Gid.z; uint y = Gid.y; uint x = Gid.x;
 	uint ind = z*(vcwidth + 1)*(vcwidth + 1) + y*(vcwidth + 1) + x;
 	uint ind1 = z*vcwidth*vcwidth + y*vcwidth + x;
-	uint max = (vcwidth + 1)*(vcwidth + 1)*(vcwidth + 1);
 
 	/// Picking
-	float4 pickID = vertexID2[uint2(pickOriginX, pickOriginY)];				// ID of picked masscube's lower left masspoint
+	float4 pickID = vertexID2[uint2(pickOriginX, pickOriginY)];				    // ID of picked masscube's lower left masspoint
 		// if picking mode is on AND the pick didn't happen over a black pixel AND the picked vertex is adjacent to the current masspoint
 		if (is_picking && pickID.w != 0 && (x == pickID.x && y == pickID.y && z == pickID.z)){
 			float len = length(ovolcube2[ind].newpos.xyz - eyePos.xyz);			// current 
@@ -205,9 +199,9 @@ void CSMain2(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 			volcube2[ind].acc.xyz = float3(0, 0, 0);
 			volcube2[ind].oldpos = ovolcube2[ind].newpos;
 			volcube2[ind].newpos.xyz = v_curr;
-
-			/// Normal mode
 		}
+
+        /// Normal mode
 		else {
 
 			uint same = ovolcube2[ind].neighbour_same;
@@ -217,13 +211,13 @@ void CSMain2(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 			/// Sum neighbouring forces
 			float3 accel = float3(0, notstaticmass*gravity*im, 0);		// gravity
 
-				// Get neighbours, set acceleration, with index checking
-				// neighbours in the same volcube + second neighbours
-				if (same & NB_SAME_LEFT){				// left neighbour
-					accel += acceleration(ovolcube2[ind], ovolcube2[ind - 1], 0);
-					if (x > 1 && (ovolcube2[ind - 1].neighbour_same & NB_SAME_LEFT))				//second to left
-						accel += acceleration(ovolcube2[ind], ovolcube2[ind - 2], 2);
-				}
+			// Get neighbours, set acceleration, with index checking
+			// neighbours in the same volcube + second neighbours
+			if (same & NB_SAME_LEFT){				// left neighbour
+				accel += acceleration(ovolcube2[ind], ovolcube2[ind - 1], 0);
+				if (x > 1 && (ovolcube2[ind - 1].neighbour_same & NB_SAME_LEFT))				//second to left
+					accel += acceleration(ovolcube2[ind], ovolcube2[ind - 2], 2);
+			}
 			if (same & NB_SAME_RIGHT){				// right neighbour 
 				accel += acceleration(ovolcube2[ind], ovolcube2[ind + 1], 0);
 				if (x < vcwidth - 1 && (ovolcube2[ind + 1].neighbour_same & NB_SAME_RIGHT))		//second to right
@@ -231,7 +225,7 @@ void CSMain2(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 			}
 			if (same & NB_SAME_DOWN){				// lower neighbour
 				accel += acceleration(ovolcube2[ind], ovolcube2[ind - vcwidth - 1], 0);
-				if (y > 1 && (ovolcube2[ind - (vcwidth + 1)].neighbour_same & NB_SAME_DOWN))			//second down
+				if (y > 1 && (ovolcube2[ind - (vcwidth + 1)].neighbour_same & NB_SAME_DOWN))	    //second down
 					accel += acceleration(ovolcube2[ind], ovolcube2[ind - 2 * (vcwidth + 1)], 2);
 			}
 			if (same & NB_SAME_UP){					// upper neighbour

@@ -94,7 +94,6 @@ public:
 	Deformable() = delete;		// no default constructor
 	~Deformable();				// default destructor
 	Deformable(std::string);	// construct with file name
-	//Deformable(const Deformable&) = delete;	// no copy constructor ***
 	void build();				// execute initializations
 	
 };
