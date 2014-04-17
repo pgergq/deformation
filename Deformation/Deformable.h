@@ -61,7 +61,7 @@ class Deformable final
 {
 private:
 	// variables
-
+    int id;
 	// functions
 	void importFile();			// initialize data from file, only available to ctor
 	void initVars();			// initialize variables (cube cell size, cube and model position)
@@ -69,6 +69,7 @@ private:
 	void initMasscubes();		// initialize masscube data
 	void initIndexer();			// init indexer structure
 	void initNeighbouring();	// set neighbouring data
+    void addOffset();           // add offset to picking IDs
 
 public:
 	// variables
@@ -82,7 +83,6 @@ public:
 	vec2int faces;				// file import data > model faces (index from 1)
 
 	XMFLOAT3 cubePos;			// offset vector added to every volumetric masspoint
-	XMFLOAT3 modelPos;			// offset vector added to every model vertex
 	int cubeCellSize;			// cell size of volcube, initial distance between two neighbouring masspoints
 
 	std::vector<PARTICLE> particles;	// particle (vertex+normal+ID) data
@@ -93,8 +93,9 @@ public:
 	// functions
 	Deformable() = delete;		// no default constructor
 	~Deformable();				// default destructor
-	Deformable(std::string);	// construct with file name
+    Deformable(std::string, int);// construct with file name
 	void build();				// execute initializations
+    void translate(int, int, int);// translate model and masscubes in space
 	
 };
 

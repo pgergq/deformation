@@ -24,10 +24,10 @@
 #define NB_OTHER_FAR_TOP_LEFT	0x02
 #define NB_OTHER_FAR_TOP_RIGHT	0x01
 
-#define exp_mul					0.05f		//0.05f
-#define exp_max					1000000		//1000000
-#define gravity					-1000		//-1000
-#define tablepos				-1000
+#define exp_mul					0.05f		// default: 0.05f
+#define exp_max					1000000		// default: 1000000
+#define gravity					-1000		// default: -1000
+#define tablepos				-1000       // default: -1000
 
 
 cbuffer cbCS : register(b0)
@@ -50,7 +50,7 @@ cbuffer cbCS : register(b0)
 	float im;				// inverse mass of masspoints
 };
 
-struct MassPoint		// vertex in the input volumetric cubes
+struct MassPoint		    // vertex in the input volumetric cubes
 {
 	float4 oldpos;
 	float4 newpos;
@@ -95,7 +95,6 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 	uint z = Gid.z; uint y = Gid.y; uint x = Gid.x;
 	uint ind = z*vcwidth*vcwidth + y*vcwidth + x;
 	uint ind2 = z*(vcwidth + 1)*(vcwidth + 1) + y*(vcwidth + 1) + x;
-	//uint max = vcwidth*vcwidth*vcwidth;
 
 	/// Picking
 	float4 pickID = vertexID1[uint2(pickOriginX, pickOriginY)];				// ID of picked masscube's lower left masspoint

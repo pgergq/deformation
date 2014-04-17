@@ -35,8 +35,8 @@ using namespace DirectX;
 // Global variables
 //--------------------------------------------------------------------------------------
 
-CModelViewerCamera                  g_Camera;                   // A model viewing camera
-
+// render variables
+CModelViewerCamera                  g_Camera;
 ID3D11VertexShader*                 g_pRenderParticlesVS = nullptr;
 ID3D11GeometryShader*               g_pRenderParticlesGS = nullptr;
 ID3D11PixelShader*                  g_pRenderParticlesPS = nullptr;
@@ -45,16 +45,12 @@ ID3D11PixelShader*                  g_pModelPS2 = nullptr;
 ID3D11SamplerState*                 g_pSampleStateLinear = nullptr;
 ID3D11BlendState*                   g_pBlendingStateParticle = nullptr;
 ID3D11DepthStencilState*            g_pDepthStencilState = nullptr;
-
 ID3D11ComputeShader*                g_pCompute1CS = nullptr;
 ID3D11ComputeShader*                g_pCompute2CS = nullptr;
 ID3D11Buffer*                       g_pcbCS = nullptr;
-
 ID3D11ComputeShader*				g_pUdateCS = nullptr;
-
 ID3D11Buffer*						g_pIndexCube = nullptr;
 ID3D11ShaderResourceView*			g_pIndexCubeRV = nullptr;
-
 ID3D11Buffer*						g_pVolCube1 = nullptr;
 ID3D11Buffer*						g_pVolCube1c = nullptr;
 ID3D11Buffer*						g_pVolCube2 = nullptr;
@@ -67,44 +63,39 @@ ID3D11UnorderedAccessView*			g_pVolCube1UAV = nullptr;
 ID3D11UnorderedAccessView*			g_pVolCube1cUAV = nullptr;
 ID3D11UnorderedAccessView*			g_pVolCube2UAV = nullptr;
 ID3D11UnorderedAccessView*			g_pVolCube2cUAV = nullptr;
-
 ID3D11Buffer*                       g_pParticleArray0 = nullptr;
 ID3D11Buffer*                       g_pParticleArray1 = nullptr;
 ID3D11ShaderResourceView*           g_pParticleArrayRV0 = nullptr;
 ID3D11ShaderResourceView*           g_pParticleArrayRV1 = nullptr;
 ID3D11UnorderedAccessView*          g_pParticleArrayUAV0 = nullptr;
 ID3D11UnorderedAccessView*          g_pParticleArrayUAV1 = nullptr;
-
 ID3D11Texture2D*					g_pModelTex[2] = { nullptr, nullptr };
 ID3D11RenderTargetView*				g_pModelRTV[2] = { nullptr, nullptr };
 ID3D11ShaderResourceView*			g_pModelSRV[2] = { nullptr, nullptr };
-
 ID3D11Buffer*                       g_pcbGS = nullptr;
-
 ID3D11ShaderResourceView*           g_pParticleTexRV = nullptr;
 
+// Scene variables
 std::vector<Deformable>				deformableObjects;				// scene objects
+int                                 objectCount;
+int                                 particleCount;
+int                                 mass1Count;
+int                                 mass2Count;
+int                                 cubeCellSize;
 
+// Window & picking variables
 int									g_nWindowWidth = 800;
 int									g_nWindowHeight = 600;
 int									g_nCurrentMouseX;
 int									g_nCurrentMouseY;
 int									g_nPickOriginX;
 int									g_nPickOriginY;
-
-std::ofstream						debug;
-
-vec2float							g_vVertices;					//* file import data > model vertices
-vec2float							g_vNormals;						//* file import data > model vertex normals
-vec2int								g_vFaces;						//* file import data > model faces (index from 1)
 bool								g_bPicking = false;				// RBUTTON is pressed
 bool								g_bRM2Texture = false;			// render model to texture for picking
-XMFLOAT3							g_vVolCubeO;					//* offset verctor added to every volumetric masspoint
-XMFLOAT3							g_vModelO(100, 100, 100);		//* offset vector for the model
 XMFLOAT4							g_vLightPosition(0, 0, -10000, 1);// light position
-int									g_nNumParticles;				//* number of particles in the loaded model
-int									g_nVolCubeCell;					//* cell size of volcube
 
+// Debug file
+std::ofstream						debug;
 
 struct PARTICLE_VERTEX
 {
@@ -140,7 +131,6 @@ struct CB_CS
     float im;				// inverse mass of masspoints
 };
 
-INDEXER* indexcube;
 
 //--------------------------------------------------------------------------------------
 // Forward declarations 
@@ -154,7 +144,7 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
 HRESULT CALLBACK OnD3D11ResizedSwapChain(ID3D11Device* pd3dDevice, IDXGISwapChain* pSwapChain, const DXGI_SURFACE_DESC* pBackBufferSurfaceDesc, void* pUserContext);
 void CALLBACK OnD3D11DestroyDevice(void* pUserContext);
 void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext);
-
+HRESULT initBuffers(ID3D11Device* pd3dDevice);
 void print_debug(const char*);
 
 
@@ -196,604 +186,6 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 
     return DXUTGetExitCode();
 }
-
-//--------------------------------------------------------------------------------------
-// Load model file, set global volcube parameters
-//-------------------------------------------------------------------------------------
-HRESULT ReadModel()
-{
-
-    // Import file
-    std::ifstream input;
-    input.open("bunny_res3_scaled.obj");	//scaled + rotated + added_normals
-
-    while (!input.eof()){
-        // get line
-        std::string line;
-        getline(input, line);
-
-        // split at spaces
-        vec1float v;
-        vec1float n;
-        vec1int f;
-        std::istringstream buf(line);
-        std::istream_iterator<std::string> start(buf), end;
-        std::vector<std::string> parts(start, end);
-
-        // store vertex
-        if (line[0] == 'v' && line[1] != 'n'){
-            // parse
-            for (auto& s : parts){
-                v.push_back((float)atof(s.c_str()));
-            }
-            //store
-            g_vVertices.push_back(v);
-        }
-        // store normal
-        else if (line[0] == 'v' && line[1] == 'n'){
-            // parse
-            for (auto& s : parts){
-                n.push_back((float)atof(s.c_str()));
-            }
-            //store
-            g_vNormals.push_back(n);
-        }
-        // store face
-        else if (line[0] == 'f'){
-            // parse
-            for (auto& s : parts){
-                f.push_back(atoi(s.c_str()));
-            }
-            //store
-            g_vFaces.push_back(f);
-        }
-    }
-
-    // get/set space division parameters
-    float minx, miny, minz, maxx, maxy, maxz;
-    maxx = minx = g_vVertices[0][1];
-    maxy = miny = g_vVertices[0][2];
-    maxz = minz = g_vVertices[0][3];
-    for (unsigned int i = 0; i < g_vVertices.size(); i++){
-        if (g_vVertices[i][1] < minx)
-            minx = g_vVertices[i][1];
-        if (g_vVertices[i][1] > maxx)
-            maxx = g_vVertices[i][1];
-        if (g_vVertices[i][2] < miny)
-            miny = g_vVertices[i][2];
-        if (g_vVertices[i][2] > maxy)
-            maxy = g_vVertices[i][2];
-        if (g_vVertices[i][3] < minz)
-            minz = g_vVertices[i][3];
-        if (g_vVertices[i][3] > maxz)
-            maxz = g_vVertices[i][3];
-    }
-
-    // tmp = greatest length in any direction (x|y|z)
-    float tmp = std::max(abs(ceil(maxx) - floor(minx)), std::max(abs(ceil(maxy) - floor(miny)), abs(ceil(maxz) - floor(minz)))) + 1;
-    // ceil((float)tmp/VCUBEWIDTH) = "tight" value of VOLCUBECELL
-    // ceil((float)(tight+50)/100)*100 = upper 100 neighbour of tight
-    tmp = ceil((float)tmp / VCUBEWIDTH);
-    tmp = ceil((float)(tmp + 50) / 100) * 100;
-    g_nVolCubeCell = (int)tmp;
-
-    // Set global volumetric cube offsets to align the model
-    g_vVolCubeO = XMFLOAT3(floor(minx), floor(miny), floor(minz));
-
-    // Set model vertex count
-    g_nNumParticles = g_vVertices.size();
-
-    return S_OK;
-}
-
-//--------------------------------------------------------------------------------------
-// Load particle buffer with initial position and normals
-//--------------------------------------------------------------------------------------
-void LoadModel(PARTICLE* pParticles)
-{
-
-    // Load particle buffer with default data
-    for (int i = 0; i < VOLCUBE1_COUNT + VOLCUBE2_COUNT + g_nNumParticles; i++){
-        pParticles[i].pos = XMFLOAT4(0, 0, 0, 1);
-        pParticles[i].npos = XMFLOAT4(0, 0, 0, 1);
-        pParticles[i].mpid1 = XMFLOAT4(0, 0, 0, 0);
-        pParticles[i].mpid2 = XMFLOAT4(0, 0, 0, 0);
-    }
-
-    // Load model vertices + normals
-    for (int i = 0; i < g_nNumParticles; i++)
-    {
-        XMVECTOR tmp = XMVectorAdd(XMVectorSet(g_vVertices[i][1], g_vVertices[i][2], g_vVertices[i][3], 1),
-            XMVectorSet(g_vModelO.x, g_vModelO.y, g_vModelO.z, 0));	//***nem fog kelleni az eltolás, done in deformable
-        XMStoreFloat4(&pParticles[i].pos, tmp);
-
-        // normalized normals -> store the endpoint of the normals (=npos)
-        float len = g_vNormals[i][1] * g_vNormals[i][1] + g_vNormals[i][2] * g_vNormals[i][2] + g_vNormals[i][3] * g_vNormals[i][3];
-        len = (len == 0 ? -1 : sqrtf(len));
-        XMVECTOR tmp2 = XMVectorSet((float)g_vNormals[i][1] / len, (float)g_vNormals[i][2] / len, (float)g_vNormals[i][3] / len, 1);
-        XMStoreFloat4(&pParticles[i].npos, XMVectorAdd(tmp, XMVector3Normalize(tmp2)));
-    }
-}
-
-//--------------------------------------------------------------------------------------
-// Load volumetric cube buffers with data, runs after LoadModel
-// Set up indexers, neighbouring
-//--------------------------------------------------------------------------------------
-void LoadVolumetricCubes(MASSPOINT* volcube1, MASSPOINT* volcube2, PARTICLE* particles)
-{
-
-    int ind;
-    unsigned int mask = 0x00;
-    // Load first volumetric cube
-    for (int i = 0; i < VCUBEWIDTH; i++)
-    {
-        for (int j = 0; j < VCUBEWIDTH; j++)
-        {
-            for (int k = 0; k < VCUBEWIDTH; k++)
-            {
-                ind = i*VCUBEWIDTH*VCUBEWIDTH + j*VCUBEWIDTH + k;
-                XMVECTOR tmp = XMVectorAdd(XMVectorSet(k * g_nVolCubeCell, j * g_nVolCubeCell, i * g_nVolCubeCell, 1), XMVectorSet(g_vVolCubeO.x, g_vVolCubeO.y, g_vVolCubeO.z, 0));
-                XMStoreFloat4(&volcube1[ind].newpos, tmp);
-                XMStoreFloat4(&volcube1[ind].oldpos, tmp);
-                volcube1[ind].acc = XMFLOAT4(0, 0, 0, 0);
-            }
-        }
-    }
-    // Load second volumetric cube
-    for (int i = 0; i < VCUBEWIDTH + 1; i++)
-    {
-        for (int j = 0; j < VCUBEWIDTH + 1; j++)
-        {
-            for (int k = 0; k < VCUBEWIDTH + 1; k++)
-            {
-                ind = i*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1) + j*(VCUBEWIDTH + 1) + k;
-                XMVECTOR tmp = XMVectorAdd(XMVectorSet(k * g_nVolCubeCell - 0.5f * g_nVolCubeCell, j * g_nVolCubeCell - 0.5f * g_nVolCubeCell, i * g_nVolCubeCell - 0.5f * g_nVolCubeCell, 1), XMVectorSet(g_vVolCubeO.x, g_vVolCubeO.y, g_vVolCubeO.z, 0));
-                XMStoreFloat4(&volcube2[ind].oldpos, tmp);
-                XMStoreFloat4(&volcube2[ind].newpos, tmp);
-                volcube2[ind].acc = XMFLOAT4(0, 0, 0, 0);
-            }
-        }
-    }
-
-    // Load indexer cube
-    indexcube = new INDEXER[g_nNumParticles];
-    XMFLOAT3 vc_pos1(volcube1[0].oldpos.x, volcube1[0].oldpos.y, volcube1[0].oldpos.z);
-    XMFLOAT3 vc_pos2(volcube2[0].oldpos.x, volcube2[0].oldpos.y, volcube2[0].oldpos.z);
-    int vind; XMFLOAT3 vertex;
-    for (int i = 0; i < g_nNumParticles; i++)
-    {
-        // Get indices and weights in first volumetric cube
-        vertex = XMFLOAT3(particles[i].pos.x, particles[i].pos.y, particles[i].pos.z);
-        int x = (std::max(vertex.x, vc_pos1.x) - std::min(vertex.x, vc_pos1.x)) / g_nVolCubeCell;
-        int y = (std::max(vertex.y, vc_pos1.y) - std::min(vertex.y, vc_pos1.y)) / g_nVolCubeCell;
-        int z = (std::max(vertex.z, vc_pos1.z) - std::min(vertex.z, vc_pos1.z)) / g_nVolCubeCell;
-        XMStoreFloat3(&indexcube[i].vc1index, XMVectorSet(x, y, z, 0));
-        XMStoreFloat4(&particles[i].mpid1, XMVectorSet(x, y, z, 1));
-
-        // trilinear interpolation
-        vind = z*VCUBEWIDTH*VCUBEWIDTH + y*VCUBEWIDTH + x;
-        float wx = (vertex.x - volcube1[vind].newpos.x) / g_nVolCubeCell;
-        float dwx = 1.0f - wx;
-        float wy = (vertex.y - volcube1[vind].newpos.y) / g_nVolCubeCell;
-        float dwy = 1.0f - wy;
-        float wz = (vertex.z - volcube1[vind].newpos.z) / g_nVolCubeCell;
-        float dwz = 1.0f - wz;
-        indexcube[i].w1[0] = dwx*dwy*dwz; indexcube[i].w1[1] = wx*dwy*dwz; indexcube[i].w1[2] = dwx*wy*dwz; indexcube[i].w1[3] = wx*wy*dwz;
-        indexcube[i].w1[4] = dwx*dwy*wz; indexcube[i].w1[5] = wx*dwy*wz; indexcube[i].w1[6] = dwx*wy*wz; indexcube[i].w1[7] = wx*wy*wz;
-
-        // trilinear for npos
-        vertex = XMFLOAT3(particles[i].npos.x, particles[i].npos.y, particles[i].npos.z);
-        wx = (vertex.x - volcube1[vind].newpos.x) / g_nVolCubeCell;
-        dwx = 1.0f - wx;
-        wy = (vertex.y - volcube1[vind].newpos.y) / g_nVolCubeCell;
-        dwy = 1.0f - wy;
-        wz = (vertex.z - volcube1[vind].newpos.z) / g_nVolCubeCell;
-        dwz = 1.0f - wz;
-        indexcube[i].nw1[0] = dwx*dwy*dwz; indexcube[i].nw1[1] = wx*dwy*dwz; indexcube[i].nw1[2] = dwx*wy*dwz; indexcube[i].nw1[3] = wx*wy*dwz;
-        indexcube[i].nw1[4] = dwx*dwy*wz; indexcube[i].nw1[5] = wx*dwy*wz; indexcube[i].nw1[6] = dwx*wy*wz; indexcube[i].nw1[7] = wx*wy*wz;
-
-
-        // Fill second indexer
-        vertex = XMFLOAT3(particles[i].pos.x, particles[i].pos.y, particles[i].pos.z);
-        x = (std::max(vertex.x, vc_pos2.x) - std::min(vertex.x, vc_pos2.x)) / g_nVolCubeCell;
-        y = (std::max(vertex.y, vc_pos2.y) - std::min(vertex.y, vc_pos2.y)) / g_nVolCubeCell;
-        z = (std::max(vertex.z, vc_pos2.z) - std::min(vertex.z, vc_pos2.z)) / g_nVolCubeCell;
-        XMStoreFloat3(&indexcube[i].vc2index, XMVectorSet(x, y, z, 0));
-        XMStoreFloat4(&particles[i].mpid2, XMVectorSet(x, y, z, 1));
-
-        vind = z*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1) + y*(VCUBEWIDTH + 1) + x;
-        wx = (vertex.x - volcube2[vind].newpos.x) / g_nVolCubeCell;
-        dwx = 1.0f - wx;
-        wy = (vertex.y - volcube2[vind].newpos.y) / g_nVolCubeCell;
-        dwy = 1.0f - wy;
-        wz = (vertex.z - volcube2[vind].newpos.z) / g_nVolCubeCell;
-        dwz = 1.0f - wz;
-        indexcube[i].w2[0] = dwx*dwy*dwz; indexcube[i].w2[1] = wx*dwy*dwz; indexcube[i].w2[2] = dwx*wy*dwz; indexcube[i].w2[3] = wx*wy*dwz;
-        indexcube[i].w2[4] = dwx*dwy*wz; indexcube[i].w2[5] = wx*dwy*wz; indexcube[i].w2[6] = dwx*wy*wz; indexcube[i].w2[7] = wx*wy*wz;
-
-        vertex = XMFLOAT3(particles[i].npos.x, particles[i].npos.y, particles[i].npos.z);
-        wx = (vertex.x - volcube2[vind].newpos.x) / g_nVolCubeCell;
-        dwx = 1.0f - wx;
-        wy = (vertex.y - volcube2[vind].newpos.y) / g_nVolCubeCell;
-        dwy = 1.0f - wy;
-        wz = (vertex.z - volcube2[vind].newpos.z) / g_nVolCubeCell;
-        dwz = 1.0f - wz;
-        indexcube[i].nw2[0] = dwx*dwy*dwz; indexcube[i].nw2[1] = wx*dwy*dwz; indexcube[i].nw2[2] = dwx*wy*dwz; indexcube[i].nw2[3] = wx*wy*dwz;
-        indexcube[i].nw2[4] = dwx*dwy*wz; indexcube[i].nw2[5] = wx*dwy*wz; indexcube[i].nw2[6] = dwx*wy*wz; indexcube[i].nw2[7] = wx*wy*wz;
-
-    }
-
-
-    /// Set proper neighbouring data (disable masspoints with no model points)
-    UINT nvc1[VCUBEWIDTH][VCUBEWIDTH][VCUBEWIDTH];
-    UINT nvc2[VCUBEWIDTH + 1][VCUBEWIDTH + 1][VCUBEWIDTH + 1];
-    for (int z = 0; z < VCUBEWIDTH; z++){
-        for (int y = 0; y < VCUBEWIDTH; y++){
-            for (int x = 0; x < VCUBEWIDTH; x++){
-                nvc1[z][y][x] = 0;
-            }
-        }
-    }
-    for (int z = 0; z < VCUBEWIDTH + 1; z++){
-        for (int y = 0; y < VCUBEWIDTH + 1; y++){
-            for (int x = 0; x < VCUBEWIDTH + 1; x++){
-                nvc2[z][y][x] = 0;
-            }
-        }
-    }
-    XMFLOAT3 vx;
-    // Set edge masspoints to 1
-    for (int i = 0; i < g_nNumParticles; i++)
-    {
-        vx = indexcube[i].vc1index;
-        nvc1[(int)vx.z][(int)vx.y][(int)vx.x] = 1;
-        nvc1[(int)vx.z][(int)vx.y][(int)vx.x + 1] = 1;
-        nvc1[(int)vx.z][(int)vx.y + 1][(int)vx.x] = 1;
-        nvc1[(int)vx.z][(int)vx.y + 1][(int)vx.x + 1] = 1;
-        nvc1[(int)vx.z + 1][(int)vx.y][(int)vx.x] = 1;
-        nvc1[(int)vx.z + 1][(int)vx.y][(int)vx.x + 1] = 1;
-        nvc1[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x] = 1;
-        nvc1[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x + 1] = 1;
-        vx = indexcube[i].vc2index;
-        nvc2[(int)vx.z][(int)vx.y][(int)vx.x] = 1;
-        nvc2[(int)vx.z][(int)vx.y][(int)vx.x + 1] = 1;
-        nvc2[(int)vx.z][(int)vx.y + 1][(int)vx.x] = 1;
-        nvc2[(int)vx.z][(int)vx.y + 1][(int)vx.x + 1] = 1;
-        nvc2[(int)vx.z + 1][(int)vx.y][(int)vx.x] = 1;
-        nvc2[(int)vx.z + 1][(int)vx.y][(int)vx.x + 1] = 1;
-        nvc2[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x] = 1;
-        nvc2[(int)vx.z + 1][(int)vx.y + 1][(int)vx.x + 1] = 1;
-    }
-
-    // Set outer masspoints to 2 - 1st volcube
-    //left+
-    for (int z = 0; z < VCUBEWIDTH; z++){
-        for (int y = 0; y < VCUBEWIDTH; y++){
-            for (int x = 0; x < VCUBEWIDTH; x++){
-                if (nvc1[z][y][x] == 1) break;
-                else nvc1[z][y][x] = 2;
-            }
-        }
-    }
-    //right+
-    for (int z = 0; z < VCUBEWIDTH; z++){
-        for (int y = 0; y < VCUBEWIDTH; y++){
-            for (int x = VCUBEWIDTH - 1; x >= 0; x--){
-                if (nvc1[z][y][x] == 1) break;
-                else nvc1[z][y][x] = 2;
-            }
-        }
-    }
-    //bottom+
-    for (int z = 0; z < VCUBEWIDTH; z++){
-        for (int x = 0; x < VCUBEWIDTH; x++){
-            for (int y = 0; y < VCUBEWIDTH; y++){
-                if (nvc1[z][y][x] == 1) break;
-                else nvc1[z][y][x] = 2;
-            }
-        }
-    }
-    //up+
-    for (int z = 0; z < VCUBEWIDTH; z++){
-        for (int x = 0; x < VCUBEWIDTH; x++){
-            for (int y = VCUBEWIDTH - 1; y >= 0; y--){
-                if (nvc1[z][y][x] == 1) break;
-                else nvc1[z][y][x] = 2;
-            }
-        }
-    }
-    //front+
-    for (int y = 0; y < VCUBEWIDTH; y++){
-        for (int x = 0; x < VCUBEWIDTH; x++){
-            for (int z = 0; z < VCUBEWIDTH; z++){
-                if (nvc1[z][y][x] == 1) break;
-                else nvc1[z][y][x] = 2;
-            }
-        }
-    }
-    //back+
-    for (int y = 0; y < VCUBEWIDTH; y++){
-        for (int x = 0; x < VCUBEWIDTH; x++){
-            for (int z = VCUBEWIDTH - 1; z >= 0; z--){
-                if (nvc1[z][y][x] == 1) break;
-                else nvc1[z][y][x] = 2;
-            }
-        }
-    }
-    //Set outer masspoints to 2 - 2nd volcube
-    //left+
-    for (int z = 0; z < VCUBEWIDTH + 1; z++){
-        for (int y = 0; y < VCUBEWIDTH + 1; y++){
-            for (int x = 0; x < VCUBEWIDTH + 1; x++){
-                if (nvc2[z][y][x] == 1) break;
-                else nvc2[z][y][x] = 2;
-            }
-        }
-    }
-    //right+
-    for (int z = 0; z < VCUBEWIDTH + 1; z++){
-        for (int y = 0; y < VCUBEWIDTH + 1; y++){
-            for (int x = VCUBEWIDTH; x >= 0; x--){
-                if (nvc2[z][y][x] == 1) break;
-                else nvc2[z][y][x] = 2;
-            }
-        }
-    }
-    //bottom+
-    for (int z = 0; z < VCUBEWIDTH + 1; z++){
-        for (int x = 0; x < VCUBEWIDTH + 1; x++){
-            for (int y = 0; y < VCUBEWIDTH + 1; y++){
-                if (nvc2[z][y][x] == 1) break;
-                else nvc2[z][y][x] = 2;
-            }
-        }
-    }
-    //up+
-    for (int z = 0; z < VCUBEWIDTH + 1; z++){
-        for (int x = 0; x < VCUBEWIDTH + 1; x++){
-            for (int y = VCUBEWIDTH; y >= 0; y--){
-                if (nvc2[z][y][x] == 1) break;
-                else nvc2[z][y][x] = 2;
-            }
-        }
-    }
-    //front+
-    for (int y = 0; y < VCUBEWIDTH + 1; y++){
-        for (int x = 0; x < VCUBEWIDTH + 1; x++){
-            for (int z = 0; z < VCUBEWIDTH + 1; z++){
-                if (nvc2[z][y][x] == 1) break;
-                else nvc2[z][y][x] = 2;
-            }
-        }
-    }
-    //back+
-    for (int y = 0; y < VCUBEWIDTH + 1; y++){
-        for (int x = 0; x < VCUBEWIDTH + 1; x++){
-            for (int z = VCUBEWIDTH; z >= 0; z--){
-                if (nvc2[z][y][x] == 1) break;
-                else nvc2[z][y][x] = 2;
-            }
-        }
-    }
-
-    // Correct neighbouring in 1st volcube
-    for (int i = 0; i < VCUBEWIDTH; i++)
-    {
-        for (int j = 0; j < VCUBEWIDTH; j++)
-        {
-            for (int k = 0; k < VCUBEWIDTH; k++)
-            {
-                ind = i*VCUBEWIDTH*VCUBEWIDTH + j*VCUBEWIDTH + k;
-
-                // same volcube bitmasks
-                mask = 0x00;
-                mask = k != 0 && nvc1[i][j][k - 1] != 2 ? mask | NB_SAME_LEFT : mask;
-                mask = k != (VCUBEWIDTH - 1) && nvc1[i][j][k + 1] != 2 ? mask | NB_SAME_RIGHT : mask;
-                mask = j != 0 && nvc1[i][j - 1][k] != 2 ? mask | NB_SAME_DOWN : mask;
-                mask = j != (VCUBEWIDTH - 1) && nvc1[i][j + 1][k] != 2 ? mask | NB_SAME_UP : mask;
-                mask = i != 0 && nvc1[i - 1][j][k] != 2 ? mask | NB_SAME_FRONT : mask;
-                mask = i != (VCUBEWIDTH - 1) && nvc1[i + 1][j][k] != 2 ? mask | NB_SAME_BACK : mask;
-                volcube1[ind].neighbour_same = mask;
-
-                // other volcube bitmasks
-                mask = 0x00;
-                mask = nvc2[i][j][k] != 2 ? mask | NB_OTHER_NEAR_BOT_LEFT : mask;
-                mask = nvc2[i][j][k + 1] != 2 ? mask | NB_OTHER_NEAR_BOT_RIGHT : mask;
-                mask = nvc2[i][j + 1][k] != 2 ? mask | NB_OTHER_NEAR_TOP_LEFT : mask;
-                mask = nvc2[i][j + 1][k + 1] != 2 ? mask | NB_OTHER_NEAR_TOP_RIGHT : mask;
-                mask = nvc2[i + 1][j][k] != 2 ? mask | NB_OTHER_FAR_BOT_LEFT : mask;
-                mask = nvc2[i + 1][j][k + 1] != 2 ? mask | NB_OTHER_FAR_BOT_RIGHT : mask;
-                mask = nvc2[i + 1][j + 1][k] != 2 ? mask | NB_OTHER_FAR_TOP_LEFT : mask;
-                mask = nvc2[i + 1][j + 1][k + 1] != 2 ? mask | NB_OTHER_FAR_TOP_RIGHT : mask;
-                volcube1[ind].neighbour_other = mask;
-            }
-        }
-    }
-
-    // Correct neighbouring in 2nd volcube
-    for (int i = 0; i < VCUBEWIDTH + 1; i++)
-    {
-        for (int j = 0; j < VCUBEWIDTH + 1; j++)
-        {
-            for (int k = 0; k < VCUBEWIDTH + 1; k++)
-            {
-                ind = i*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1) + j*(VCUBEWIDTH + 1) + k;
-
-                // same volcube bitmasks
-                mask = 0x00;
-                mask = k != 0 && nvc2[i][j][k - 1] != 2 ? mask | NB_SAME_LEFT : mask;
-                mask = k != (VCUBEWIDTH) && nvc2[i][j][k + 1] != 2 ? mask | NB_SAME_RIGHT : mask;
-                mask = j != 0 && nvc2[i][j - 1][k] != 2 ? mask | NB_SAME_DOWN : mask;
-                mask = j != (VCUBEWIDTH) && nvc2[i][j + 1][k] != 2 ? mask | NB_SAME_UP : mask;
-                mask = i != 0 && nvc2[i - 1][j][k] != 2 ? mask | NB_SAME_FRONT : mask;
-                mask = i != (VCUBEWIDTH) && nvc2[i + 1][j][k] != 2 ? mask | NB_SAME_BACK : mask;
-                volcube2[ind].neighbour_same = mask;
-
-                //// other volcube bitmasks
-                mask = 0x00;
-                mask = (i != 0 && j != 0 && k != 0) && nvc1[i - 1][j - 1][k - 1] != 2 ? mask | NB_OTHER_NEAR_BOT_LEFT : mask;
-                mask = (i != 0 && j != 0 && k != VCUBEWIDTH) && nvc1[i - 1][j - 1][k] != 2 ? mask | NB_OTHER_NEAR_BOT_RIGHT : mask;
-                mask = (i != 0 && j != VCUBEWIDTH && k != 0) && nvc1[i - 1][j][k - 1] != 2 ? mask | NB_OTHER_NEAR_TOP_LEFT : mask;
-                mask = (i != 0 && j != VCUBEWIDTH && k != VCUBEWIDTH) && nvc1[i - 1][j][k] != 2 ? mask | NB_OTHER_NEAR_TOP_RIGHT : mask;
-                mask = (i != VCUBEWIDTH && j != 0 && k != 0) && nvc1[i][j - 1][k - 1] != 2 ? mask | NB_OTHER_FAR_BOT_LEFT : mask;
-                mask = (i != VCUBEWIDTH && j != 0 && k != VCUBEWIDTH) && nvc1[i][j - 1][k] != 2 ? mask | NB_OTHER_FAR_BOT_RIGHT : mask;
-                mask = (i != VCUBEWIDTH && j != VCUBEWIDTH && k != 0) && nvc1[i][j][k - 1] != 2 ? mask | NB_OTHER_FAR_TOP_LEFT : mask;
-                mask = (i != VCUBEWIDTH && j != VCUBEWIDTH && k != VCUBEWIDTH) && nvc1[i][j][k] != 2 ? mask | NB_OTHER_FAR_TOP_RIGHT : mask;
-                volcube2[ind].neighbour_other = mask;
-            }
-        }
-    }
-}
-
-//--------------------------------------------------------------------------------------
-// Create and initialize buffer structures
-//--------------------------------------------------------------------------------------
-HRESULT CreateParticlePosVeloBuffers(ID3D11Device* pd3dDevice)
-{
-
-    HRESULT hr = S_OK;
-
-    // Desc for Particle buffers
-    D3D11_BUFFER_DESC desc;
-    ZeroMemory(&desc, sizeof(desc));
-    desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-    desc.ByteWidth = (g_nNumParticles + VOLCUBE1_COUNT + VOLCUBE2_COUNT) * sizeof(PARTICLE);
-    desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-    desc.StructureByteStride = sizeof(PARTICLE);
-    desc.Usage = D3D11_USAGE_DEFAULT;
-
-    // Desc for Volumetric buffer
-    D3D11_BUFFER_DESC vdesc;
-    ZeroMemory(&vdesc, sizeof(vdesc));
-    vdesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-    vdesc.ByteWidth = VOLCUBE1_COUNT * sizeof(MASSPOINT);
-    vdesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-    vdesc.StructureByteStride = sizeof(MASSPOINT);
-    vdesc.Usage = D3D11_USAGE_DEFAULT;
-
-    // Initialize the data in the buffers
-    PARTICLE* pData1 = new PARTICLE[(g_nNumParticles + VOLCUBE1_COUNT + VOLCUBE2_COUNT)];
-    MASSPOINT* vData1 = new MASSPOINT[VOLCUBE1_COUNT];
-    MASSPOINT* vData2 = new MASSPOINT[VOLCUBE2_COUNT];
-    if (!pData1 || !vData1 || !vData2)
-        return E_OUTOFMEMORY;
-
-    // Load Particle cube, load Volumetric cubes
-    LoadModel(pData1);
-    LoadVolumetricCubes(vData1, vData2, pData1);
-
-    // Set initial Particles data
-    D3D11_SUBRESOURCE_DATA InitData;
-    InitData.pSysMem = pData1;
-    V_RETURN(pd3dDevice->CreateBuffer(&desc, &InitData, &g_pParticleArray0));
-    V_RETURN(pd3dDevice->CreateBuffer(&desc, &InitData, &g_pParticleArray1));
-    DXUT_SetDebugName(g_pParticleArray0, "ParticleArray0");
-    DXUT_SetDebugName(g_pParticleArray1, "ParticleArray1");
-    SAFE_DELETE_ARRAY(pData1);
-
-    ///Set initial Volumetric data
-    D3D11_SUBRESOURCE_DATA v1data;
-    v1data.pSysMem = vData1;
-    D3D11_SUBRESOURCE_DATA v2data;
-    v2data.pSysMem = vData2;
-    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v1data, &g_pVolCube1));
-    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v1data, &g_pVolCube1c));
-    DXUT_SetDebugName(g_pVolCube1, "VolCube1");
-    DXUT_SetDebugName(g_pVolCube1c, "VolCube1c");
-    SAFE_DELETE_ARRAY(vData1);
-    vdesc.ByteWidth = VOLCUBE2_COUNT * sizeof(MASSPOINT);
-    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v2data, &g_pVolCube2));
-    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v2data, &g_pVolCube2c));
-    DXUT_SetDebugName(g_pVolCube2, "VolCube2");
-    DXUT_SetDebugName(g_pVolCube2c, "VolCube2c");
-    SAFE_DELETE_ARRAY(vData2);
-
-
-    /// Buffer for IndexCube
-    D3D11_BUFFER_DESC desc2;
-    ZeroMemory(&desc2, sizeof(desc2));
-    desc2.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-    desc2.ByteWidth = g_nNumParticles * sizeof(INDEXER);
-    desc2.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-    desc2.StructureByteStride = sizeof(INDEXER);
-    desc2.Usage = D3D11_USAGE_DEFAULT;
-    D3D11_SUBRESOURCE_DATA indexer_init;
-    indexer_init.pSysMem = indexcube;
-    V_RETURN(pd3dDevice->CreateBuffer(&desc2, &indexer_init, &g_pIndexCube));
-    DXUT_SetDebugName(g_pIndexCube, "IndexCube");
-    SAFE_DELETE_ARRAY(indexcube);
-
-    /// RV for Particle data
-    D3D11_SHADER_RESOURCE_VIEW_DESC DescRV;
-    ZeroMemory(&DescRV, sizeof(DescRV));
-    DescRV.Format = DXGI_FORMAT_UNKNOWN;
-    DescRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-    DescRV.Buffer.FirstElement = 0;
-    DescRV.Buffer.NumElements = desc.ByteWidth / desc.StructureByteStride;
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pParticleArray0, &DescRV, &g_pParticleArrayRV0));
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pParticleArray1, &DescRV, &g_pParticleArrayRV1));
-    DXUT_SetDebugName(g_pParticleArrayRV0, "ParticleArray0 SRV");
-    DXUT_SetDebugName(g_pParticleArrayRV1, "ParticleArray1 SRV");
-
-    /// SRV for indexcube
-    D3D11_SHADER_RESOURCE_VIEW_DESC DescRV2;
-    ZeroMemory(&DescRV2, sizeof(DescRV2));
-    DescRV2.Format = DXGI_FORMAT_UNKNOWN;
-    DescRV2.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-    DescRV2.Buffer.FirstElement = 0;
-    DescRV2.Buffer.NumElements = desc2.ByteWidth / desc2.StructureByteStride;
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pIndexCube, &DescRV2, &g_pIndexCubeRV));
-    DXUT_SetDebugName(g_pIndexCubeRV, "IndexCube SRV");
-
-    /// SRV for VolCubes
-    D3D11_SHADER_RESOURCE_VIEW_DESC DescRVV;
-    ZeroMemory(&DescRVV, sizeof(DescRVV));
-    DescRVV.Format = DXGI_FORMAT_UNKNOWN;
-    DescRVV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-    DescRVV.Buffer.FirstElement = 0;
-    DescRVV.Buffer.NumElements = VOLCUBE1_COUNT;
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube1, &DescRVV, &g_pVolCube1RV));
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube1c, &DescRVV, &g_pVolCube1cRV));
-    DXUT_SetDebugName(g_pVolCube1RV, "VolCube1 RV");
-    DXUT_SetDebugName(g_pVolCube1cRV, "VolCube1c RV");
-    DescRVV.Buffer.NumElements = VOLCUBE2_COUNT;
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube2, &DescRVV, &g_pVolCube2RV));
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube2c, &DescRVV, &g_pVolCube2cRV));
-    DXUT_SetDebugName(g_pVolCube2RV, "VolCube2 RV");
-    DXUT_SetDebugName(g_pVolCube2cRV, "VolCube2c RV");
-
-    /// UAV for Particle data
-    D3D11_UNORDERED_ACCESS_VIEW_DESC DescUAV;
-    ZeroMemory(&DescUAV, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
-    DescUAV.Format = DXGI_FORMAT_UNKNOWN;
-    DescUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-    DescUAV.Buffer.FirstElement = 0;
-    DescUAV.Buffer.NumElements = desc.ByteWidth / desc.StructureByteStride;
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pParticleArray0, &DescUAV, &g_pParticleArrayUAV0));
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pParticleArray1, &DescUAV, &g_pParticleArrayUAV1));
-    DXUT_SetDebugName(g_pParticleArrayUAV0, "ParticleArray0 UAV");
-    DXUT_SetDebugName(g_pParticleArrayUAV1, "ParticleArray1 UAV");
-
-    /// UAVs for Volumetric data
-    D3D11_UNORDERED_ACCESS_VIEW_DESC vDescUAV;
-    ZeroMemory(&vDescUAV, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
-    vDescUAV.Format = DXGI_FORMAT_UNKNOWN;
-    vDescUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-    vDescUAV.Buffer.FirstElement = 0;
-    vDescUAV.Buffer.NumElements = (VOLCUBE1_COUNT * sizeof(MASSPOINT)) / vdesc.StructureByteStride;
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube1, &vDescUAV, &g_pVolCube1UAV));
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube1c, &vDescUAV, &g_pVolCube1cUAV));
-    DXUT_SetDebugName(g_pVolCube1UAV, "VolCube1 UAV");
-    DXUT_SetDebugName(g_pVolCube1cUAV, "VolCube1c UAV");
-    vDescUAV.Buffer.NumElements = (VOLCUBE2_COUNT * sizeof(MASSPOINT)) / vdesc.StructureByteStride;
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube2, &vDescUAV, &g_pVolCube2UAV));
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube2c, &vDescUAV, &g_pVolCube2cUAV));
-    DXUT_SetDebugName(g_pVolCube2UAV, "VolCube2 UAV");
-    DXUT_SetDebugName(g_pVolCube2cUAV, "VolCube2c UAV");
-
-    return hr;
-}
-
 
 //--------------------------------------------------------------------------------------
 // On device settings modifications 
@@ -842,8 +234,8 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
 
     // Update CS constant buffer
     pcbCS->vcwidth = VCUBEWIDTH;
-    pcbCS->vccell = g_nVolCubeCell * 1.2f;
-    pcbCS->numparticles = g_nNumParticles;
+    pcbCS->vccell = cubeCellSize;
+    pcbCS->numparticles = particleCount;
     pcbCS->stiffness = g_fStiffness;
     pcbCS->damping = g_fDamping;
     pcbCS->dt = fElapsedTime;
@@ -909,7 +301,7 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
     pd3dImmediateContext->CSSetUnorderedAccessViews(0, 3, uaUAViews, (UINT*)(&uaUAViews));
 
     //pd3dImmediateContext->Dispatch(g_nNumParticles, 1, 1);
-    pd3dImmediateContext->Dispatch((g_nNumParticles + VOLCUBE1_COUNT + VOLCUBE2_COUNT), 1, 1);
+    pd3dImmediateContext->Dispatch(particleCount, 1, 1);
 
     ID3D11UnorderedAccessView* uppUAViewNULL[3] = { nullptr, nullptr, nullptr };
     pd3dImmediateContext->CSSetUnorderedAccessViews(0, 3, uppUAViewNULL, (UINT*)(&uaUAViews));
@@ -965,7 +357,6 @@ LRESULT CALLBACK MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, boo
     return 0;
 }
 
-
 //------------------------------------------------------
 // Handle keypresses
 //------------------------------------------------------
@@ -977,52 +368,52 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
     XMVECTOR y = XMVectorSet(0, 200, 0, 0);
     XMVECTOR v;
     switch (nChar){
-    case VK_LEFT:
-        v = XMVectorSubtract(g_Camera.GetEyePt(), x);
-        XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
-        g_Camera.SetViewParams(eye, lookat);
-        break;
-    case VK_RIGHT:
-        v = XMVectorAdd(g_Camera.GetEyePt(), x);
-        XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
-        g_Camera.SetViewParams(eye, lookat);
-        break;
-    case VK_UP:
-        v = XMVectorAdd(g_Camera.GetEyePt(), y);
-        XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
-        g_Camera.SetViewParams(eye, lookat);
-        break;
-    case VK_DOWN:
-        v = XMVectorSubtract(g_Camera.GetEyePt(), y);
-        XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
-        g_Camera.SetViewParams(eye, lookat);
-        break;
-    case 0x58:    // 'X' key
-    {
-        SAFE_RELEASE(g_pParticleArray0);
-        SAFE_RELEASE(g_pParticleArray1);
-        SAFE_RELEASE(g_pParticleArrayRV0);
-        SAFE_RELEASE(g_pParticleArrayRV1);
-        SAFE_RELEASE(g_pParticleArrayUAV0);
-        SAFE_RELEASE(g_pParticleArrayUAV1);
-        SAFE_RELEASE(g_pIndexCube);
-        SAFE_RELEASE(g_pIndexCubeRV);
-        SAFE_RELEASE(g_pVolCube1);
-        SAFE_RELEASE(g_pVolCube1c);
-        SAFE_RELEASE(g_pVolCube1RV);
-        SAFE_RELEASE(g_pVolCube1cRV);
-        SAFE_RELEASE(g_pVolCube1UAV);
-        SAFE_RELEASE(g_pVolCube1cUAV);
-        SAFE_RELEASE(g_pVolCube2);
-        SAFE_RELEASE(g_pVolCube2c);
-        SAFE_RELEASE(g_pVolCube2RV);
-        SAFE_RELEASE(g_pVolCube2cRV);
-        SAFE_RELEASE(g_pVolCube2UAV);
-        SAFE_RELEASE(g_pVolCube2cUAV);
-        CreateParticlePosVeloBuffers(DXUTGetD3D11Device());
-        break;
-    }
-    default: break;
+        case VK_LEFT:
+            v = XMVectorSubtract(g_Camera.GetEyePt(), x);
+            XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
+            g_Camera.SetViewParams(eye, lookat);
+            break;
+        case VK_RIGHT:
+            v = XMVectorAdd(g_Camera.GetEyePt(), x);
+            XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
+            g_Camera.SetViewParams(eye, lookat);
+            break;
+        case VK_UP:
+            v = XMVectorAdd(g_Camera.GetEyePt(), y);
+            XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
+            g_Camera.SetViewParams(eye, lookat);
+            break;
+        case VK_DOWN:
+            v = XMVectorSubtract(g_Camera.GetEyePt(), y);
+            XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
+            g_Camera.SetViewParams(eye, lookat);
+            break;
+        case 0x58:    // 'X' key
+        {
+            SAFE_RELEASE(g_pParticleArray0);
+            SAFE_RELEASE(g_pParticleArray1);
+            SAFE_RELEASE(g_pParticleArrayRV0);
+            SAFE_RELEASE(g_pParticleArrayRV1);
+            SAFE_RELEASE(g_pParticleArrayUAV0);
+            SAFE_RELEASE(g_pParticleArrayUAV1);
+            SAFE_RELEASE(g_pIndexCube);
+            SAFE_RELEASE(g_pIndexCubeRV);
+            SAFE_RELEASE(g_pVolCube1);
+            SAFE_RELEASE(g_pVolCube1c);
+            SAFE_RELEASE(g_pVolCube1RV);
+            SAFE_RELEASE(g_pVolCube1cRV);
+            SAFE_RELEASE(g_pVolCube1UAV);
+            SAFE_RELEASE(g_pVolCube1cUAV);
+            SAFE_RELEASE(g_pVolCube2);
+            SAFE_RELEASE(g_pVolCube2c);
+            SAFE_RELEASE(g_pVolCube2RV);
+            SAFE_RELEASE(g_pVolCube2cRV);
+            SAFE_RELEASE(g_pVolCube2UAV);
+            SAFE_RELEASE(g_pVolCube2cUAV);
+            initBuffers(DXUTGetD3D11Device());
+            break;
+        }
+        default: break;
     }
 }
 
@@ -1043,20 +434,27 @@ bool CALLBACK IsD3D11DeviceAcceptable(const CD3D11EnumAdapterInfo *AdapterInfo, 
 HRESULT importFiles(){
 
     // set up first bunny: create Deformable, build representation, add to central container
-    Deformable body1("bunny_res3_scaled.obj");
-    body1.cubePos = XMFLOAT3(100, 100, 100);
+    Deformable body1("bunny_res3_scaled.obj", 0);
     body1.build();
     deformableObjects.push_back(body1);
 
-    //set up second bunny
-    Deformable body2("bunny_res3_scaled.obj");
-    body2.cubePos = XMFLOAT3(400, 100, 100);
-    body2.build();
-    deformableObjects.push_back(body2);
+    ////set up second bunny
+    //Deformable body2("bunny_res3_scaled.obj", 1);
+    //body2.build();
+    //deformableObjects.push_back(body2);
+
+    // Set variables
+    objectCount = deformableObjects.size();
+    particleCount = mass1Count = mass2Count = 0;
+    for (unsigned int i = 0; i < deformableObjects.size(); i++){
+        particleCount += deformableObjects[i].particles.size();
+        mass1Count += deformableObjects[i].masscube1.size();
+        mass2Count += deformableObjects[i].masscube2.size();
+    }
+    cubeCellSize = deformableObjects[0].cubeCellSize;
 
     return S_OK;
 }
-
 
 //--------------------------------------------------------------------------------------
 // Init shaders, set vertex buffer
@@ -1126,6 +524,187 @@ HRESULT initShaders(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediate
     SAFE_RELEASE(pBlobUpdateCS);
 
     return S_OK;
+}
+
+//--------------------------------------------------------------------------------------
+// Create buffer structures with initial data
+//--------------------------------------------------------------------------------------
+HRESULT initBuffers(ID3D11Device* pd3dDevice)
+{
+
+    HRESULT hr = S_OK;
+
+    // Load particle and masscube data in temporal arrays
+    PARTICLE* pData1 = new PARTICLE[particleCount];
+    INDEXER* iData1 = new INDEXER[particleCount];
+    MASSPOINT* vData1 = new MASSPOINT[mass1Count];
+    MASSPOINT* vData2 = new MASSPOINT[mass2Count];
+    if (!pData1 || !iData1 || !vData1 || !vData2)
+        return E_OUTOFMEMORY;
+
+    unsigned int x = 0;
+    for (unsigned int i = 0; i < objectCount; i++){
+        for (int k = 0; k < deformableObjects[i].particles.size(); k++){
+            pData1[x] = deformableObjects[i].particles[k];
+            x++;
+        }
+    }
+    x = 0;
+    unsigned int size = sizeof(float[8]);
+    for (unsigned int i = 0; i < objectCount; i++){
+        for (int k = 0; k < deformableObjects[i].indexcube.size(); k++){
+            iData1[x].vc1index = deformableObjects[i].indexcube[k].vc1index;
+            iData1[x].vc2index = deformableObjects[i].indexcube[k].vc2index;
+            memcpy(iData1[x].w1, deformableObjects[i].indexcube[k].w1, size);
+            memcpy(iData1[x].nw1, deformableObjects[i].indexcube[k].nw1, size);
+            memcpy(iData1[x].w2, deformableObjects[i].indexcube[k].w2, size);
+            memcpy(iData1[x].nw2, deformableObjects[i].indexcube[k].nw2, size);
+            x++;
+        }
+    }
+    x = 0;
+    for (unsigned int i = 0; i < objectCount; i++){
+        for (int k = 0; k < deformableObjects[i].masscube1.size(); k++){
+            vData1[x] = deformableObjects[i].masscube1[k];
+            x++;
+        }
+    }
+    x = 0;
+    for (unsigned int i = 0; i < objectCount; i++){
+        for (int k = 0; k < deformableObjects[i].masscube2.size(); k++){
+            vData2[x] = deformableObjects[i].masscube2[k];
+            x++;
+        }
+    }
+
+    // Desc for Particle buffers
+    D3D11_BUFFER_DESC desc;
+    ZeroMemory(&desc, sizeof(desc));
+    desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+    desc.ByteWidth = particleCount * sizeof(PARTICLE);
+    desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+    desc.StructureByteStride = sizeof(PARTICLE);
+    desc.Usage = D3D11_USAGE_DEFAULT;
+
+    // Desc for Volumetric buffer
+    D3D11_BUFFER_DESC vdesc;
+    ZeroMemory(&vdesc, sizeof(vdesc));
+    vdesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+    vdesc.ByteWidth = mass1Count * sizeof(MASSPOINT);
+    vdesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+    vdesc.StructureByteStride = sizeof(MASSPOINT);
+    vdesc.Usage = D3D11_USAGE_DEFAULT;
+
+    // Set initial Particles data
+    D3D11_SUBRESOURCE_DATA InitData;
+    InitData.pSysMem = pData1;
+    V_RETURN(pd3dDevice->CreateBuffer(&desc, &InitData, &g_pParticleArray0));
+    V_RETURN(pd3dDevice->CreateBuffer(&desc, &InitData, &g_pParticleArray1));
+    DXUT_SetDebugName(g_pParticleArray0, "ParticleArray0");
+    DXUT_SetDebugName(g_pParticleArray1, "ParticleArray1");
+    SAFE_DELETE_ARRAY(pData1);
+
+    ///Set initial Volumetric data
+    D3D11_SUBRESOURCE_DATA v1data;
+    v1data.pSysMem = vData1;
+    D3D11_SUBRESOURCE_DATA v2data;
+    v2data.pSysMem = vData2;
+    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v1data, &g_pVolCube1));
+    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v1data, &g_pVolCube1c));
+    DXUT_SetDebugName(g_pVolCube1, "VolCube1");
+    DXUT_SetDebugName(g_pVolCube1c, "VolCube1c");
+    SAFE_DELETE_ARRAY(vData1);
+    vdesc.ByteWidth = mass2Count * sizeof(MASSPOINT);
+    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v2data, &g_pVolCube2));
+    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v2data, &g_pVolCube2c));
+    DXUT_SetDebugName(g_pVolCube2, "VolCube2");
+    DXUT_SetDebugName(g_pVolCube2c, "VolCube2c");
+    SAFE_DELETE_ARRAY(vData2);
+
+
+    /// Buffer for IndexCube
+    D3D11_BUFFER_DESC desc2;
+    ZeroMemory(&desc2, sizeof(desc2));
+    desc2.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+    desc2.ByteWidth = particleCount * sizeof(INDEXER);
+    desc2.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+    desc2.StructureByteStride = sizeof(INDEXER);
+    desc2.Usage = D3D11_USAGE_DEFAULT;
+    D3D11_SUBRESOURCE_DATA indexer_init;
+    indexer_init.pSysMem = iData1;
+    V_RETURN(pd3dDevice->CreateBuffer(&desc2, &indexer_init, &g_pIndexCube));
+    DXUT_SetDebugName(g_pIndexCube, "IndexCube");
+    SAFE_DELETE_ARRAY(iData1);
+
+    /// RV for Particle data
+    D3D11_SHADER_RESOURCE_VIEW_DESC DescRV;
+    ZeroMemory(&DescRV, sizeof(DescRV));
+    DescRV.Format = DXGI_FORMAT_UNKNOWN;
+    DescRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+    DescRV.Buffer.FirstElement = 0;
+    DescRV.Buffer.NumElements = particleCount;
+    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pParticleArray0, &DescRV, &g_pParticleArrayRV0));
+    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pParticleArray1, &DescRV, &g_pParticleArrayRV1));
+    DXUT_SetDebugName(g_pParticleArrayRV0, "ParticleArray0 SRV");
+    DXUT_SetDebugName(g_pParticleArrayRV1, "ParticleArray1 SRV");
+
+    /// SRV for indexcube
+    D3D11_SHADER_RESOURCE_VIEW_DESC DescRV2;
+    ZeroMemory(&DescRV2, sizeof(DescRV2));
+    DescRV2.Format = DXGI_FORMAT_UNKNOWN;
+    DescRV2.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+    DescRV2.Buffer.FirstElement = 0;
+    DescRV2.Buffer.NumElements = particleCount;
+    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pIndexCube, &DescRV2, &g_pIndexCubeRV));
+    DXUT_SetDebugName(g_pIndexCubeRV, "IndexCube SRV");
+
+    /// SRV for VolCubes
+    D3D11_SHADER_RESOURCE_VIEW_DESC DescRVV;
+    ZeroMemory(&DescRVV, sizeof(DescRVV));
+    DescRVV.Format = DXGI_FORMAT_UNKNOWN;
+    DescRVV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+    DescRVV.Buffer.FirstElement = 0;
+    DescRVV.Buffer.NumElements = mass1Count;
+    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube1, &DescRVV, &g_pVolCube1RV));
+    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube1c, &DescRVV, &g_pVolCube1cRV));
+    DXUT_SetDebugName(g_pVolCube1RV, "VolCube1 RV");
+    DXUT_SetDebugName(g_pVolCube1cRV, "VolCube1c RV");
+    DescRVV.Buffer.NumElements = mass2Count;
+    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube2, &DescRVV, &g_pVolCube2RV));
+    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube2c, &DescRVV, &g_pVolCube2cRV));
+    DXUT_SetDebugName(g_pVolCube2RV, "VolCube2 RV");
+    DXUT_SetDebugName(g_pVolCube2cRV, "VolCube2c RV");
+
+    /// UAV for Particle data
+    D3D11_UNORDERED_ACCESS_VIEW_DESC DescUAV;
+    ZeroMemory(&DescUAV, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
+    DescUAV.Format = DXGI_FORMAT_UNKNOWN;
+    DescUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+    DescUAV.Buffer.FirstElement = 0;
+    DescUAV.Buffer.NumElements = particleCount;
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pParticleArray0, &DescUAV, &g_pParticleArrayUAV0));
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pParticleArray1, &DescUAV, &g_pParticleArrayUAV1));
+    DXUT_SetDebugName(g_pParticleArrayUAV0, "ParticleArray0 UAV");
+    DXUT_SetDebugName(g_pParticleArrayUAV1, "ParticleArray1 UAV");
+
+    /// UAVs for Volumetric data
+    D3D11_UNORDERED_ACCESS_VIEW_DESC vDescUAV;
+    ZeroMemory(&vDescUAV, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
+    vDescUAV.Format = DXGI_FORMAT_UNKNOWN;
+    vDescUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+    vDescUAV.Buffer.FirstElement = 0;
+    vDescUAV.Buffer.NumElements = mass1Count;
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube1, &vDescUAV, &g_pVolCube1UAV));
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube1c, &vDescUAV, &g_pVolCube1cUAV));
+    DXUT_SetDebugName(g_pVolCube1UAV, "VolCube1 UAV");
+    DXUT_SetDebugName(g_pVolCube1cUAV, "VolCube1c UAV");
+    vDescUAV.Buffer.NumElements = mass2Count;
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube2, &vDescUAV, &g_pVolCube2UAV));
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube2c, &vDescUAV, &g_pVolCube2cUAV));
+    DXUT_SetDebugName(g_pVolCube2UAV, "VolCube2 UAV");
+    DXUT_SetDebugName(g_pVolCube2cUAV, "VolCube2c UAV");
+
+    return hr;
 }
 
 //--------------------------------------------------------------------------------------
@@ -1276,11 +855,8 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
     // Import objects from files, set up deformable objects
     V_RETURN(importFiles());
 
-    // Read model file, set global volcube parameters //***
-    V_RETURN(ReadModel());
-
-    //***
-    V_RETURN(CreateParticlePosVeloBuffers(pd3dDevice));
+    // Initialize buffers with data
+    V_RETURN(initBuffers(pd3dDevice));
 
     // Create textures&buffers for picking
     V_RETURN(initPicking(pd3dDevice, 800, 600));
@@ -1362,14 +938,14 @@ bool drawPicking(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
 
 
     // Render first "layer" of information: vertex IDs in first volcube
-    pd3dImmediateContext->Draw(g_nNumParticles, 0);
+    pd3dImmediateContext->Draw(particleCount, 0);
 
     // Render second layer of information: vertex IDs in second volcube
     pd3dImmediateContext->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1.0, 0);
     pd3dImmediateContext->OMSetRenderTargets(1, &g_pModelRTV[1], pDSV);
     pd3dImmediateContext->ClearRenderTargetView(g_pModelRTV[1], Colors::Black);
     pd3dImmediateContext->PSSetShader(g_pModelPS2, nullptr, 0);
-    pd3dImmediateContext->Draw(g_nNumParticles, 0);
+    pd3dImmediateContext->Draw(particleCount, 0);
 
 
     ID3D11ShaderResourceView* ppSRVNULL[1] = { nullptr };
@@ -1422,7 +998,7 @@ bool drawObjects(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
     pd3dImmediateContext->OMSetBlendState(g_pBlendingStateParticle, bf, 0xFFFFFFFF);
     pd3dImmediateContext->OMSetDepthStencilState(g_pDepthStencilState, 0);
 
-    pd3dImmediateContext->Draw((g_nNumParticles + VOLCUBE1_COUNT + VOLCUBE2_COUNT), 0);
+    pd3dImmediateContext->Draw(particleCount, 0);
 
     ID3D11ShaderResourceView* ppSRVNULL[1] = { nullptr };
     pd3dImmediateContext->VSSetShaderResources(0, 1, ppSRVNULL);

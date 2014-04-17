@@ -20,9 +20,7 @@
 
 /// DEFORMATION defines
 #define VCUBEWIDTH		19											// n*n*n inner cube, (n+1)*(n+1)*(n+1) outer cube
-#define VOLCUBE1_COUNT	VCUBEWIDTH*VCUBEWIDTH*VCUBEWIDTH			// number of masspoints in the smaller volumetric cube
-#define VOLCUBE2_COUNT	(VCUBEWIDTH+1)*(VCUBEWIDTH+1)*(VCUBEWIDTH+1) // number of masspoints in the bigger volumetric cube
-#define MODEL_OFFSET	100
+//#define MODEL_OFFSET	100
 
 // volcube neighbouring data
 #define NB_SAME_LEFT			0x20								// 0010 0000, has left neighbour

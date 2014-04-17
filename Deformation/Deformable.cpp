@@ -21,10 +21,10 @@
 //--------------------------------------------------------------------------------------
 // Constructor
 //--------------------------------------------------------------------------------------
-Deformable::Deformable(std::string x){
+Deformable::Deformable(std::string x, int id){
 
 	this->file = x;		// file must be .obj formatted, with equal number of vertices and vertex normals (plus optional face data)
-
+    this->id = id;      // object ID in the applications object-container (determines offset in buffers)
 }
 
 //--------------------------------------------------------------------------------------
@@ -38,6 +38,7 @@ void Deformable::build(){
 	this->initMasscubes();
 	this->initIndexer();
 	this->initNeighbouring();
+    this->addOffset();
 
 }
 
@@ -132,7 +133,6 @@ void Deformable::initVars(){
 
 	// Set global volumetric cube offsets to align the model
 	this->cubePos = XMFLOAT3(floor(minx), floor(miny), floor(minz));
-	this->modelPos = XMFLOAT3(MODEL_OFFSET, MODEL_OFFSET, MODEL_OFFSET);
 
 	// Set data
 	this->vertexCount = this->vertices.size();
@@ -156,14 +156,13 @@ void Deformable::initParticles(){
 		PARTICLE push { XMFLOAT4(0, 0, 0, 1), XMFLOAT4(0, 0, 0, 1), XMFLOAT4(0, 0, 0, 0), XMFLOAT4(0, 0, 0, 0) };
 		
 		// position
-		XMVECTOR tmp = XMVectorAdd(XMVectorSet(this->vertices[i][1], this->vertices[i][2], this->vertices[i][3], 1),
-						XMVectorSet(this->modelPos.x, this->modelPos.y, this->modelPos.z, 0));
+		XMVECTOR tmp = XMVectorSet(this->vertices[i][1], this->vertices[i][2], this->vertices[i][3], 1);
 		XMStoreFloat4(&push.pos, tmp);
 
 		// normalized normals -> store the endpoint of the normals (=npos)
 		float len = this->normals[i][1] * this->normals[i][1] + this->normals[i][2] * this->normals[i][2] + this->normals[i][3] * this->normals[i][3];
 		len = (len == 0 ? -1 : sqrtf(len));
-		XMVECTOR tmp2 = XMVectorSet((float)this->normals[i][1] / len, (float)this->normals[i][2] / len, (float)this->normals[i][3] / len, 1);
+		XMVECTOR tmp2 = XMVectorSet((float)this->normals[i][1] / len, (float)this->normals[i][2] / len, (float)this->normals[i][3] / len, 0);
 		XMStoreFloat4(&push.npos, XMVectorAdd(tmp, XMVector3Normalize(tmp2)));
 
 		// store temporary vector in container
@@ -522,17 +521,63 @@ void Deformable::initNeighbouring(){
 }
 
 //--------------------------------------------------------------------------------------
-// 
+// Add offset to picking helper IDs
 //--------------------------------------------------------------------------------------
+void Deformable::addOffset(){
 
+    int offset1 = id * VCUBEWIDTH;           // object masspoint1 offset in central containers, added to Z mpid
+    int offset2 = id * (VCUBEWIDTH + 1);     // object masspoint2 offset in central containers, added to Z mpid
 
+    // add offset to particle data
+    for (int i = 0; i < particles.size(); i++){
+        particles[i].mpid1.z += offset1;
+        particles[i].mpid2.z += offset2;
+    }
 
+    // add offset to indexer data
+    for (int i = 0; i < indexcube.size(); i++){
+        indexcube[i].vc1index.z += offset1;
+        indexcube[i].vc2index.z += offset2;
+    }
+}
 
+//--------------------------------------------------------------------------------------
+// Translate model and masscubes in space
+//--------------------------------------------------------------------------------------
+void Deformable::translate(int x, int y, int z){
 
+    // add vector to model points
+    for (int i = 0; i < particles.size(); i++){
+        particles[i].pos.x += x;
+        particles[i].pos.y += y;
+        particles[i].pos.z += z;
+        particles[i].npos.x += x;
+        particles[i].npos.y += y;
+        particles[i].npos.z += z;
+    }
 
+    // add offset to indexer data
+    for (int i = 0; i < masscube1.size(); i++){
+        masscube1[i].newpos.x += x;
+        masscube1[i].oldpos.x += x;
+        masscube1[i].newpos.y += y;
+        masscube1[i].oldpos.y += y;
+        masscube1[i].newpos.z += z;
+        masscube1[i].oldpos.z += z;
+    }
 
+    // add offset to indexer data
+    for (int i = 0; i < masscube2.size(); i++){
+        masscube2[i].newpos.x += x;
+        masscube2[i].oldpos.x += x;
+        masscube2[i].newpos.y += y;
+        masscube2[i].oldpos.y += y;
+        masscube2[i].newpos.z += z;
+        masscube2[i].oldpos.z += z;
+    }
+}
 
-
-
-
+//--------------------------------------------------------------------------------------
+// Destructor
+//--------------------------------------------------------------------------------------
 Deformable::~Deformable(){ /* nothing dynamic to dispose of*/ }
