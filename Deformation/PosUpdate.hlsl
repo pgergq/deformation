@@ -66,7 +66,6 @@ RWStructuredBuffer<MassPoint> volcube2	: register(u2);
 void PosUpdate(uint3 DTid : SV_DispatchThreadID)
 {
 	// Calculate new particle position
-	float3 oldppos = particles[DTid.x].pos.xyz;
 	int ind1 = indexer[DTid.x].vc1index.z*vcwidth*vcwidth + indexer[DTid.x].vc1index.y*vcwidth + indexer[DTid.x].vc1index.x;
 	int ind2 = indexer[DTid.x].vc2index.z*(vcwidth + 1)*(vcwidth + 1) + indexer[DTid.x].vc2index.y*(vcwidth + 1) + indexer[DTid.x].vc2index.x;
 	float3 pos1 = indexer[DTid.x].w1[0] * volcube1[ind1].newpos.xyz +

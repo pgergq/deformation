@@ -529,13 +529,13 @@ void Deformable::addOffset(){
     int offset2 = id * (VCUBEWIDTH + 1);     // object masspoint2 offset in central containers, added to Z mpid
 
     // add offset to particle data
-    for (int i = 0; i < particles.size(); i++){
+    for (uint i = 0; i < particles.size(); i++){
         particles[i].mpid1.z += offset1;
         particles[i].mpid2.z += offset2;
     }
 
     // add offset to indexer data
-    for (int i = 0; i < indexcube.size(); i++){
+    for (uint i = 0; i < indexcube.size(); i++){
         indexcube[i].vc1index.z += offset1;
         indexcube[i].vc2index.z += offset2;
     }
@@ -547,7 +547,7 @@ void Deformable::addOffset(){
 void Deformable::translate(int x, int y, int z){
 
     // add vector to model points
-    for (int i = 0; i < particles.size(); i++){
+    for (uint i = 0; i < particles.size(); i++){
         particles[i].pos.x += x;
         particles[i].pos.y += y;
         particles[i].pos.z += z;
@@ -557,7 +557,7 @@ void Deformable::translate(int x, int y, int z){
     }
 
     // add offset to indexer data
-    for (int i = 0; i < masscube1.size(); i++){
+    for (uint i = 0; i < masscube1.size(); i++){
         masscube1[i].newpos.x += x;
         masscube1[i].oldpos.x += x;
         masscube1[i].newpos.y += y;
@@ -567,7 +567,7 @@ void Deformable::translate(int x, int y, int z){
     }
 
     // add offset to indexer data
-    for (int i = 0; i < masscube2.size(); i++){
+    for (uint i = 0; i < masscube2.size(); i++){
         masscube2[i].newpos.x += x;
         masscube2[i].oldpos.x += x;
         masscube2[i].newpos.y += y;

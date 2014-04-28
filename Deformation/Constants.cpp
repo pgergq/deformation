@@ -12,6 +12,6 @@
 #include "Constants.h"
 
 float g_fSpread = 400.0f;
-float g_fStiffness = 100.0f;
+float g_fStiffness = 400.0f;
 float g_fDamping = -3.0f;
 float g_fInvMass = 1.0f;

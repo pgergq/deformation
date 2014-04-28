@@ -19,8 +19,7 @@
 
 
 /// DEFORMATION defines
-#define VCUBEWIDTH		19											// n*n*n inner cube, (n+1)*(n+1)*(n+1) outer cube
-//#define MODEL_OFFSET	100
+#define VCUBEWIDTH		13											// n*n*n inner cube, (n+1)*(n+1)*(n+1) outer cube
 
 // volcube neighbouring data
 #define NB_SAME_LEFT			0x20								// 0010 0000, has left neighbour
@@ -46,5 +45,7 @@ extern float g_fSpread;
 extern float g_fStiffness;
 extern float g_fDamping;
 extern float g_fInvMass;
+
+typedef unsigned int uint;
 
 #endif

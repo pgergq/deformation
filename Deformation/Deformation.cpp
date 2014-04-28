@@ -77,11 +77,11 @@ ID3D11ShaderResourceView*           g_pParticleTexRV = nullptr;
 
 // Scene variables
 std::vector<Deformable>				deformableObjects;				// scene objects
-int                                 objectCount;
-int                                 particleCount;
-int                                 mass1Count;
-int                                 mass2Count;
-int                                 cubeCellSize;
+uint                                objectCount;
+uint                                particleCount;
+uint                                mass1Count;
+uint                                mass2Count;
+uint                                cubeCellSize;
 
 // Window & picking variables
 int									g_nWindowWidth = 800;
@@ -270,11 +270,11 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
     pd3dImmediateContext->CSSetConstantBuffers(0, 1, ppCB);
 
     // Run first CS (first volcube)
-    pd3dImmediateContext->Dispatch(VCUBEWIDTH, VCUBEWIDTH, VCUBEWIDTH);
+    pd3dImmediateContext->Dispatch(VCUBEWIDTH, VCUBEWIDTH, VCUBEWIDTH * objectCount);
 
     // Run second CS (second volcube)
     pd3dImmediateContext->CSSetShader(g_pCompute2CS, nullptr, 0);
-    pd3dImmediateContext->Dispatch(VCUBEWIDTH + 1, VCUBEWIDTH + 1, VCUBEWIDTH + 1);
+    pd3dImmediateContext->Dispatch((VCUBEWIDTH + 1), (VCUBEWIDTH + 1), (VCUBEWIDTH + 1) * objectCount);
 
     // Unbind resources for CS
     ID3D11ShaderResourceView* srvnull[4] = { nullptr, nullptr, nullptr, nullptr };
@@ -328,6 +328,17 @@ void print_debug(const char* string)
     debug << "[" << 1900 + ctime->tm_year << "." << std::setw(2) << std::setfill('0') << ctime->tm_mon << "." << ctime->tm_mday << ". " << ctime->tm_hour << ":" << ctime->tm_min << ":" << ctime->tm_sec << "]\t" << string << std::endl;
     debug.close();
 }
+
+//--------------------------------------------------------------------------------------
+// Print debug information to console
+//--------------------------------------------------------------------------------------
+void print_debug_float(float out)
+{
+    std::wstringstream a; a << "[" << out << "]" << std::endl;
+    std::wstring b = a.str();
+    OutputDebugString(b.c_str());
+}
+
 
 //--------------------------------------------------------------------------------------
 // Handle messages (first: button overrides, second: DXUT camera)
@@ -438,10 +449,11 @@ HRESULT importFiles(){
     body1.build();
     deformableObjects.push_back(body1);
 
-    ////set up second bunny
-    //Deformable body2("bunny_res3_scaled.obj", 1);
-    //body2.build();
-    //deformableObjects.push_back(body2);
+    //set up second bunny
+    Deformable body2("bunny_res3_scaled.obj", 1);
+    body2.build();
+    body2.translate(1000, 0, 0);
+    deformableObjects.push_back(body2);
 
     // Set variables
     objectCount = deformableObjects.size();
@@ -452,6 +464,10 @@ HRESULT importFiles(){
         mass2Count += deformableObjects[i].masscube2.size();
     }
     cubeCellSize = deformableObjects[0].cubeCellSize;
+
+    print_debug_float(mass1Count);
+    print_debug_float(mass2Count);
+    print_debug_float(objectCount);
 
     return S_OK;
 }
@@ -542,17 +558,17 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     if (!pData1 || !iData1 || !vData1 || !vData2)
         return E_OUTOFMEMORY;
 
-    unsigned int x = 0;
-    for (unsigned int i = 0; i < objectCount; i++){
-        for (int k = 0; k < deformableObjects[i].particles.size(); k++){
+    uint x = 0;
+    for (uint i = 0; i < objectCount; i++){
+        for (uint k = 0; k < deformableObjects[i].particles.size(); k++){
             pData1[x] = deformableObjects[i].particles[k];
             x++;
         }
     }
     x = 0;
-    unsigned int size = sizeof(float[8]);
-    for (unsigned int i = 0; i < objectCount; i++){
-        for (int k = 0; k < deformableObjects[i].indexcube.size(); k++){
+    uint size = sizeof(float[8]);
+    for (uint i = 0; i < objectCount; i++){
+        for (uint k = 0; k < deformableObjects[i].indexcube.size(); k++){
             iData1[x].vc1index = deformableObjects[i].indexcube[k].vc1index;
             iData1[x].vc2index = deformableObjects[i].indexcube[k].vc2index;
             memcpy(iData1[x].w1, deformableObjects[i].indexcube[k].w1, size);
@@ -563,15 +579,15 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
         }
     }
     x = 0;
-    for (unsigned int i = 0; i < objectCount; i++){
-        for (int k = 0; k < deformableObjects[i].masscube1.size(); k++){
+    for (uint i = 0; i < objectCount; i++){
+        for (uint k = 0; k < deformableObjects[i].masscube1.size(); k++){
             vData1[x] = deformableObjects[i].masscube1[k];
             x++;
         }
     }
     x = 0;
-    for (unsigned int i = 0; i < objectCount; i++){
-        for (int k = 0; k < deformableObjects[i].masscube2.size(); k++){
+    for (uint i = 0; i < objectCount; i++){
+        for (uint k = 0; k < deformableObjects[i].masscube2.size(); k++){
             vData2[x] = deformableObjects[i].masscube2[k];
             x++;
         }

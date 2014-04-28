@@ -121,7 +121,7 @@ void GSParticleDraw(point VSParticle input[1], inout TriangleStream<GSParticleDr
 
 		//vertex -> two triangles
 		float3 position = g_positions[i] * g_fParticleRad * 2.5f;
-		position = mul(position, (float3x3)g_mInvView) + input[0].pos;	// world position
+		position = mul(position, (float3x3)g_mInvView) + input[0].pos.xyz;	// world position
 		output.pos = mul(float4(position, 1.0), g_mWorldViewProj);
 		
 		//shading
@@ -136,8 +136,8 @@ void GSParticleDraw(point VSParticle input[1], inout TriangleStream<GSParticleDr
 
 		//texture and vertex IDs
 		output.tex = g_texcoords[i];
-		output.mpid1 = input[0].mpid1;
-		output.mpid2 = input[0].mpid2;
+		output.mpid1 = input[0].mpid1.xyz;
+		output.mpid2 = input[0].mpid2.xyz;
 		SpriteStream.Append(output);
 	}
 	SpriteStream.RestartStrip();
