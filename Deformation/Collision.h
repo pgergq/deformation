@@ -13,18 +13,18 @@
 #define _COLLISION_H_
 
 #include <vector>
+#include <cfloat>
 #include "Deformable.h"
 
 
 typedef unsigned int uint;
 
 /// Structure representing BVBox data
-/// if(isLeaf) -> the box contains 2 masspoints with given bounding box
-/// if(!isLeaf) -> the box contains only min and max coords for children objects
+/// isLeaf -> the box contains 2 masspoints with given bounding box (<-- valid ID(s))
 struct BVBOX {
 
-    uint leftID;            // ID of left child masspoint
-    uint rightID;           // ID of right child masspoint
+    int leftID;            // ID of left child masspoint
+    int rightID;           // ID of right child masspoint
 
     float minX;             // coordinates
     float maxX;
@@ -33,13 +33,12 @@ struct BVBOX {
     float minZ;
     float maxZ;
 
-    bool isLeaf;            // isLeaf==true -> valid left and right ID with min and max coords
-                            // isLeaf==false -> valid min and max coords
+    BVBOX() : leftID(-1), rightID(-1), minX(FLT_MAX), maxX(FLT_MIN), minY(FLT_MAX), maxY(FLT_MIN), minZ(FLT_MAX), maxZ(FLT_MIN) {}
 };
 
 typedef std::vector<MASSPOINT> MassVector;
 typedef std::vector<BVBOX> BVBoxVector;
-typedef std::tuple<uint, MASSPOINT> MassID;
+typedef std::tuple<int, MASSPOINT> MassID;
 typedef std::vector<MassID> MassIDVector;
 
 /// Class representing a Bounding Volume Hierarchy
@@ -51,16 +50,14 @@ private:
 
 public:
     //variables
-    BVBOX* bvh;                                     // BVHierarchy in its final array-representation
-    uint bvhsize;                                   // size(bvh)
+    BVBoxVector bvh;                                // BVHierarchy in its final array-representation
 
     //functions
     BVHierarchy() = delete;                         // no default constructor
     BVHierarchy(MassVector masspoints);             // construct BVBox from given masspoints
     ~BVHierarchy();                                 // destructor
     BVBoxVector sort(MassIDVector masspoints, uint mode);       // sort masspoints in order, add IDs
-    //BVBoxVector hierarchize(MassIDVector masspoints, uint mode);  // build hierarchy from vector<MASSPOINT>
-
+    BVBoxVector merge(BVBoxVector a, BVBoxVector b);            // merge two binary trees into one array
 };
 
 

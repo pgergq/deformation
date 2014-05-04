@@ -27,6 +27,7 @@
 #include <time.h>
 #include "Deformable.h"
 #include "Constants.h"
+#include "Collision.h"
 
 
 using namespace DirectX;
@@ -145,7 +146,7 @@ HRESULT CALLBACK OnD3D11ResizedSwapChain(ID3D11Device* pd3dDevice, IDXGISwapChai
 void CALLBACK OnD3D11DestroyDevice(void* pUserContext);
 void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext);
 HRESULT initBuffers(ID3D11Device* pd3dDevice);
-void print_debug(const char*);
+void print_debug_file(const char*);
 
 
 
@@ -320,7 +321,7 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
 //--------------------------------------------------------------------------------------
 // Print debug information to file
 //--------------------------------------------------------------------------------------
-void print_debug(const char* string)
+void print_debug_file(const char* string)
 {
     time_t cti = time(nullptr);
     struct tm* ctime = localtime(&cti);
@@ -338,6 +339,17 @@ void print_debug_float(float out)
     std::wstring b = a.str();
     OutputDebugString(b.c_str());
 }
+
+//--------------------------------------------------------------------------------------
+// Print debug information to console
+//--------------------------------------------------------------------------------------
+void print_debug_string(std::string out)
+{
+    std::wstringstream a; a << "[" << out.c_str() << "]" << std::endl;
+    std::wstring b = a.str();
+    OutputDebugString(b.c_str());
+}
+
 
 
 //--------------------------------------------------------------------------------------
@@ -468,6 +480,19 @@ HRESULT importFiles(){
     print_debug_float(mass1Count);
     print_debug_float(mass2Count);
     print_debug_float(objectCount);
+
+    /// debug
+    MassVector mv;
+    for (uint i = 0; i < 10; i++)
+    {
+        MASSPOINT tmp;
+        tmp.newpos = XMFLOAT4((i * 17) % 10, (i * 17) % 10, (i * 17) % 10, 1);
+        mv.push_back(tmp);
+    }
+
+    BVHierarchy bvh(mv);
+
+    /// debug
 
     return S_OK;
 }
