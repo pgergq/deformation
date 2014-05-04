@@ -26,6 +26,7 @@
     <ClCompile Include="Deformation.cpp" />
     <ClInclude Include="Deformable.h" />
     <ClInclude Include="Constants.h" />
+    <ClInclude Include="Collision.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ParticleDraw.hlsl">
@@ -45,5 +46,6 @@
   <ItemGroup>
     <ClCompile Include="Deformable.cpp" />
     <ClCompile Include="Constants.cpp" />
+    <ClCompile Include="Collision.cpp" />
   </ItemGroup>
 </Project>

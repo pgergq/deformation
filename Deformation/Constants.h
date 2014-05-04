@@ -45,6 +45,7 @@ extern float g_fSpread;
 extern float g_fStiffness;
 extern float g_fDamping;
 extern float g_fInvMass;
+extern float g_fCollisionRange;
 
 typedef unsigned int uint;
 

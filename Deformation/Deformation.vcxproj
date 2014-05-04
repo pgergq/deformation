@@ -377,11 +377,13 @@
     <None Include="..\..\DXUT11\Optional\directx.ico" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Collision.cpp" />
     <ClCompile Include="Constants.cpp" />
     <ClCompile Include="Deformable.cpp">
       <PrecompiledHeaderOutputFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
     </ClCompile>
     <ClCompile Include="Deformation.cpp" />
+    <ClInclude Include="Collision.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="Deformable.h" />
     <CLInclude Include="WaitDlg.h" />

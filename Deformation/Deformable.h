@@ -31,72 +31,74 @@ typedef std::vector<std::vector<int>> vec2int;
 // Helper structures
 struct MASSPOINT
 {
-	XMFLOAT4 oldpos;		// previous position of masspoint
-	XMFLOAT4 newpos;		// current position of masspoint
-	XMFLOAT4 acc;			// masspoint acceleration
-	unsigned int neighbour_same;	// neighbour_data mask in the same volcube
-	unsigned int neighbour_other;	// neighbour_data mask in the other volcube
+    XMFLOAT4 oldpos;		// previous position of masspoint
+    XMFLOAT4 newpos;		// current position of masspoint
+    XMFLOAT4 acc;			// masspoint acceleration
+    unsigned int neighbour_same;	// neighbour_data mask in the same volcube
+    unsigned int neighbour_other;	// neighbour_data mask in the other volcube
 };
 
 struct PARTICLE
 {
-	XMFLOAT4 pos;			// model vertex position in world space
-	XMFLOAT4 npos;			// model vertex normal's end point (normal = (npos-pos))
-	XMFLOAT4 mpid1;			// model masscube ID (#1)
-	XMFLOAT4 mpid2;			// model masscube ID (#2)
+    XMFLOAT4 pos;			// model vertex position in world space
+    XMFLOAT4 npos;			// model vertex normal's end point (normal = (npos-pos))
+    XMFLOAT4 mpid1;			// model masscube ID (#1)
+    XMFLOAT4 mpid2;			// model masscube ID (#2)
 };
 
 struct INDEXER
 {
-	XMFLOAT3 vc1index;
-	XMFLOAT3 vc2index;
-	float w1[8];
-	float w2[8];
-	float nw1[8];
-	float nw2[8];
+    XMFLOAT3 vc1index;
+    XMFLOAT3 vc2index;
+    float w1[8];
+    float w2[8];
+    float nw1[8];
+    float nw2[8];
 };
 
 
+
+/// Class representing a deformable object model (vertices, masscubes, helper structures)
 class Deformable final
 {
 private:
-	// variables
+    // variables
     int id;
-	// functions
-	void importFile();			// initialize data from file, only available to ctor
-	void initVars();			// initialize variables (cube cell size, cube and model position)
-	void initParticles();		// initialize particle container
-	void initMasscubes();		// initialize masscube data
-	void initIndexer();			// init indexer structure
-	void initNeighbouring();	// set neighbouring data
+    // functions
+    void importFile();			// initialize data from file, only available to ctor
+    void initVars();			// initialize variables (cube cell size, cube and model position)
+    void initParticles();		// initialize particle container
+    void initMasscubes();		// initialize masscube data
+    void initIndexer();			// init indexer structure
+    void initNeighbouring();	// set neighbouring data
     void addOffset();           // add offset to picking IDs
 
 public:
-	// variables
-	std::string file;			// model .obj file
+    // variables
+    std::string file;			// model .obj file
 
-	float vertexCount;			// 
-	vec2float vertices;			// file import data > model vertices
-	float normalCount;			// 
-	vec2float normals;			// file import data > model vertex normals
-	float faceCount;			// 
-	vec2int faces;				// file import data > model faces (index from 1)
+    float vertexCount;			// 
+    vec2float vertices;			// file import data > model vertices
+    float normalCount;			// 
+    vec2float normals;			// file import data > model vertex normals
+    float faceCount;			// 
+    vec2int faces;				// file import data > model faces (index from 1)
 
-	XMFLOAT3 cubePos;			// offset vector added to every volumetric masspoint
-	int cubeCellSize;			// cell size of volcube, initial distance between two neighbouring masspoints
+    XMFLOAT3 cubePos;			// offset vector added to every volumetric masspoint
+    int cubeCellSize;			// cell size of volcube, initial distance between two neighbouring masspoints
 
-	std::vector<PARTICLE> particles;	// particle (vertex+normal+ID) data
-	std::vector<MASSPOINT> masscube1;	// masscube1 of model
-	std::vector<MASSPOINT> masscube2;	// masscube2 of model
-	std::vector<INDEXER> indexcube;		// indexer structure for the model
-	
-	// functions
-	Deformable() = delete;		// no default constructor
-	~Deformable();				// default destructor
+    std::vector<PARTICLE> particles;	// particle (vertex+normal+ID) data
+    std::vector<MASSPOINT> masscube1;	// masscube1 of model
+    std::vector<MASSPOINT> masscube2;	// masscube2 of model
+    std::vector<INDEXER> indexcube;		// indexer structure for the model
+    
+    // functions
+    Deformable() = delete;		// no default constructor
+    ~Deformable();				// default destructor
     Deformable(std::string, int);// construct with file name
-	void build();				// execute initializations
+    void build();				// execute initializations
     void translate(int, int, int);// translate model and masscubes in space
-	
+    
 };
 
 #endif
