@@ -9,13 +9,14 @@
 // @Copyright (c) pgq
 //--------------------------------------------------------------------------------------
 
-#include "Deformable.h"
-#include "Constants.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include "DXUT.h"
+#include "Deformable.h"
+#include "Constants.h"
+#include "Collision.h"
 
 
 //--------------------------------------------------------------------------------------
@@ -299,8 +300,6 @@ void Deformable::initIndexer(){
 void Deformable::initNeighbouring(){
 
     /// Set proper neighbouring data (disable masspoints with no model points)
-    unsigned int nvc1[VCUBEWIDTH][VCUBEWIDTH][VCUBEWIDTH];
-    unsigned int nvc2[VCUBEWIDTH + 1][VCUBEWIDTH + 1][VCUBEWIDTH + 1];
     for (int z = 0; z < VCUBEWIDTH; z++){
         for (int y = 0; y < VCUBEWIDTH; y++){
             for (int x = 0; x < VCUBEWIDTH; x++){
@@ -576,6 +575,41 @@ void Deformable::translate(int x, int y, int z){
         masscube2[i].oldpos.z += z;
     }
 }
+
+
+//--------------------------------------------------------------------------------------
+// Initialize collision detection helper structures
+// CALL MANUALLY AFTER TRANSLATING THE MODEL!
+//--------------------------------------------------------------------------------------
+void Deformable::initCollisionDetection(){
+
+    MassIDVector tmp1, tmp2;
+
+    // create MassIDs from surface masspoints in 1st vc
+    for (uint z = 0; z < VCUBEWIDTH; z++){
+        for (uint y = 0; y < VCUBEWIDTH; y++){
+            for (uint x = 0; x < VCUBEWIDTH; x++){
+                if (nvc1[z][y][x] == 1){               // type 1 masspoint -> model surface masspoints
+                    tmp1.push_back(MassID(z*VCUBEWIDTH*VCUBEWIDTH + y*VCUBEWIDTH + x, masscube1[z*VCUBEWIDTH*VCUBEWIDTH + y*VCUBEWIDTH + x]));
+                }
+            }
+        }
+    }
+    ctree1 = BVHierarchy(tmp1).bvh;
+
+    // create MassIDs from surface masspoints in 2nd vc
+    for (uint z = 0; z < VCUBEWIDTH + 1; z++){
+        for (uint y = 0; y < VCUBEWIDTH + 1; y++){
+            for (uint x = 0; x < VCUBEWIDTH + 1; x++){
+                if (nvc2[z][y][x] == 1){               // type 1 masspoint -> model surface masspoints
+                    tmp2.push_back(MassID(z*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1) + y*(VCUBEWIDTH + 1) + x, masscube2[z*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1) + y*(VCUBEWIDTH + 1) + x]));
+                }
+            }
+        }
+    }
+    ctree2 = BVHierarchy(tmp2).bvh;         // store BVHierarchy
+}
+
 
 //--------------------------------------------------------------------------------------
 // Destructor

@@ -17,7 +17,7 @@
 
 
 //--------------------------------------------------------------------------------------
-// Constructor: malloc tree memory, build tree, sort tree
+// Constructor1: malloc tree memory, build tree, sort tree
 //--------------------------------------------------------------------------------------
 BVHierarchy::BVHierarchy(MassVector masspoints){
     
@@ -29,6 +29,30 @@ BVHierarchy::BVHierarchy(MassVector masspoints){
     x.reserve(size+ext);
     for (uint i = 0; i < size; i++){
         x.push_back(std::tuple<int, MASSPOINT>(i, masspoints[i]));
+    }
+    for (uint i = 0; i < ext; i++){
+        x.push_back(std::tuple<int, MASSPOINT>(-1, MASSPOINT{}));
+    }
+
+    // sort and structurise input
+    bvh = sort(x, 0);
+
+}
+
+
+//--------------------------------------------------------------------------------------
+// Constructor2: malloc tree memory, build tree, sort tree (<- USE THIS)
+//--------------------------------------------------------------------------------------
+BVHierarchy::BVHierarchy(MassIDVector masspoints){
+
+    // Mass[] -> Mass+ID[]
+    MassIDVector x;
+    uint size = masspoints.size();
+    // extend array to contain power-of-2 number elements
+    uint ext = std::exp2(std::ceil(std::log2(size))) - size;
+    x.reserve(size + ext);
+    for (uint i = 0; i < size; i++){
+        x.push_back(masspoints[i]);
     }
     for (uint i = 0; i < ext; i++){
         x.push_back(std::tuple<int, MASSPOINT>(-1, MASSPOINT{}));
@@ -159,7 +183,7 @@ BVBoxVector BVHierarchy::sort(MassIDVector masspoints, uint mode){
 
 
 //--------------------------------------------------------------------------------------
-// Merge: get two binary trees in array representation, merge them, and convert back to array
+// Merge: get two binary trees in an array -> merge them -> convert back to array
 //--------------------------------------------------------------------------------------
 BVBoxVector BVHierarchy::merge(BVBoxVector a, BVBoxVector b){
 

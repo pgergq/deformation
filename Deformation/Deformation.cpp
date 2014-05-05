@@ -24,6 +24,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <array>
 #include <time.h>
 #include "Deformable.h"
 #include "Constants.h"
@@ -470,28 +471,23 @@ HRESULT importFiles(){
     // Set variables
     objectCount = deformableObjects.size();
     particleCount = mass1Count = mass2Count = 0;
-    for (unsigned int i = 0; i < deformableObjects.size(); i++){
+
+    for (uint i = 0; i < deformableObjects.size(); i++){
         particleCount += deformableObjects[i].particles.size();
         mass1Count += deformableObjects[i].masscube1.size();
         mass2Count += deformableObjects[i].masscube2.size();
     }
     cubeCellSize = deformableObjects[0].cubeCellSize;
 
+    // Initialize collision detection structures -- AFTER TRANSALTING THE MODELS
+    for (uint i = 0; i < objectCount; i++){
+        deformableObjects[i].initCollisionDetection();
+    }
+
+    /// debug
     print_debug_float(mass1Count);
     print_debug_float(mass2Count);
     print_debug_float(objectCount);
-
-    /// debug
-    MassVector mv;
-    for (uint i = 0; i < 10; i++)
-    {
-        MASSPOINT tmp;
-        tmp.newpos = XMFLOAT4((i * 17) % 10, (i * 17) % 10, (i * 17) % 10, 1);
-        mv.push_back(tmp);
-    }
-
-    BVHierarchy bvh(mv);
-
     /// debug
 
     return S_OK;
@@ -617,6 +613,10 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
             x++;
         }
     }
+
+    /// ***TODO*** load ctrees in one place
+
+
 
     // Desc for Particle buffers
     D3D11_BUFFER_DESC desc;

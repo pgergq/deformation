@@ -15,47 +15,14 @@
 // includes
 #include <string>
 #include <vector>
+#include <array>
 #include <DirectXMath.h>
+#include "Constants.h"
+#include "Collision.h"
 
 
 // namespace
 using namespace DirectX;
-
-// typedefs for easier handling, also used in Deformation.cpp
-typedef std::vector<float> vec1float;
-typedef std::vector<int> vec1int;
-typedef std::vector<std::vector<float>> vec2float;
-typedef std::vector<std::vector<int>> vec2int;
-
-
-// Helper structures
-struct MASSPOINT
-{
-    XMFLOAT4 oldpos;		// previous position of masspoint
-    XMFLOAT4 newpos;		// current position of masspoint
-    XMFLOAT4 acc;			// masspoint acceleration
-    unsigned int neighbour_same;	// neighbour_data mask in the same volcube
-    unsigned int neighbour_other;	// neighbour_data mask in the other volcube
-};
-
-struct PARTICLE
-{
-    XMFLOAT4 pos;			// model vertex position in world space
-    XMFLOAT4 npos;			// model vertex normal's end point (normal = (npos-pos))
-    XMFLOAT4 mpid1;			// model masscube ID (#1)
-    XMFLOAT4 mpid2;			// model masscube ID (#2)
-};
-
-struct INDEXER
-{
-    XMFLOAT3 vc1index;
-    XMFLOAT3 vc2index;
-    float w1[8];
-    float w2[8];
-    float nw1[8];
-    float nw2[8];
-};
-
 
 
 /// Class representing a deformable object model (vertices, masscubes, helper structures)
@@ -91,13 +58,19 @@ public:
     std::vector<MASSPOINT> masscube1;	// masscube1 of model
     std::vector<MASSPOINT> masscube2;	// masscube2 of model
     std::vector<INDEXER> indexcube;		// indexer structure for the model
-    
+
+    std::array<std::array<std::array<uint, VCUBEWIDTH>, VCUBEWIDTH>, VCUBEWIDTH> nvc1;   // neighbouring data in the first volcube
+    std::array<std::array<std::array<uint, VCUBEWIDTH + 1>, VCUBEWIDTH + 1>, VCUBEWIDTH + 1> nvc2;   // ...second volcube
+    BVBoxVector ctree1;         // collision detection helper structure for 1st masscube
+    BVBoxVector ctree2;         // ... 2nd masscube
+
     // functions
     Deformable() = delete;		// no default constructor
     ~Deformable();				// default destructor
     Deformable(std::string, int);// construct with file name
     void build();				// execute initializations
     void translate(int, int, int);// translate model and masscubes in space
+    void initCollisionDetection();  // initialize collision detection helper structures
     
 };
 
