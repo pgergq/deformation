@@ -22,38 +22,38 @@ using namespace DirectX;
 
 // constant defines for Deformation.cpp and Deformable.cpp
 
-#define GET_X_LPARAM(lp)		((int)(short)LOWORD(lp))
-#define GET_Y_LPARAM(lp)		((int)(short)HIWORD(lp))
+#define GET_X_LPARAM(lp)        ((int)(short)LOWORD(lp))
+#define GET_Y_LPARAM(lp)        ((int)(short)HIWORD(lp))
 
 
 /// DEFORMATION defines
-#define VCUBEWIDTH		13											// n*n*n inner cube, (n+1)*(n+1)*(n+1) outer cube
+#define VCUBEWIDTH              13          // n*n*n inner cube, (n+1)*(n+1)*(n+1) outer cube
 
 // volcube neighbouring data
-#define NB_SAME_LEFT			0x20								// 0010 0000, has left neighbour
-#define NB_SAME_RIGHT			0x10								// 0001 0000, has right neighbour
-#define NB_SAME_DOWN			0x08								// 0000 1000, ...
-#define NB_SAME_UP				0x04								// 0000 0100
-#define NB_SAME_FRONT			0x02								// 0000 0010
-#define NB_SAME_BACK			0x01								// 0000 0001
+#define NB_SAME_LEFT            0x20        // 0010 0000, has left neighbour
+#define NB_SAME_RIGHT           0x10        // 0001 0000, has right neighbour
+#define NB_SAME_DOWN            0x08        // 0000 1000, ...
+#define NB_SAME_UP              0x04        // 0000 0100
+#define NB_SAME_FRONT           0x02        // 0000 0010
+#define NB_SAME_BACK            0x01        // 0000 0001
 // NEAR = lower end of Z axis, nearer to the viewer
 // FAR = higher Z values, farther into the screen
-#define NB_OTHER_NEAR_BOT_LEFT	0x80								// 1000 0000
-#define NB_OTHER_NEAR_BOT_RIGHT	0x40								// 0100 0000
-#define NB_OTHER_NEAR_TOP_LEFT	0x20								// 0010 0000
-#define NB_OTHER_NEAR_TOP_RIGHT	0x10								// 0001 0000
-#define NB_OTHER_FAR_BOT_LEFT	0x08								// 0000 1000
-#define NB_OTHER_FAR_BOT_RIGHT	0x04								// 0000 0100
-#define NB_OTHER_FAR_TOP_LEFT	0x02								// 0000 0010
-#define NB_OTHER_FAR_TOP_RIGHT	0x01								// 0000 0001
+#define NB_OTHER_NEAR_BOT_LEFT  0x80        // 1000 0000
+#define NB_OTHER_NEAR_BOT_RIGHT 0x40        // 0100 0000
+#define NB_OTHER_NEAR_TOP_LEFT  0x20        // 0010 0000
+#define NB_OTHER_NEAR_TOP_RIGHT 0x10        // 0001 0000
+#define NB_OTHER_FAR_BOT_LEFT   0x08        // 0000 1000
+#define NB_OTHER_FAR_BOT_RIGHT  0x04        // 0000 0100
+#define NB_OTHER_FAR_TOP_LEFT   0x02        // 0000 0010
+#define NB_OTHER_FAR_TOP_RIGHT  0x01        // 0000 0001
 
 
 // some constants
-extern float g_fSpread;
-extern float g_fStiffness;
-extern float g_fDamping;
-extern float g_fInvMass;
-extern float g_fCollisionRange;
+extern float spreadConstant;
+extern float stiffnessConstant;
+extern float dampingConstant;
+extern float invMassConstant;
+extern float collisionRangeConstant;
 
 
 
@@ -68,40 +68,40 @@ struct CB_GS
 
 struct CB_CS
 {
-    unsigned int cubeWidth;			// number of masspoint in the smaller volcube in one row
-    unsigned int cubeCellSize;		// size of one volcube cell
-    unsigned int particleCount;		// total count of model vertices
+    unsigned int cubeWidth;         // number of masspoint in the smaller volcube in one row
+    unsigned int cubeCellSize;      // size of one volcube cell
+    unsigned int particleCount;     // total count of model vertices
 
-    unsigned int isPicking;			// bool for mouse picking
-    unsigned int pickOriginX;		// pick origin
-    unsigned int pickOriginY;		// pick origin
-    unsigned int dummy1;			// dummy
+    unsigned int isPicking;         // bool for mouse picking
+    unsigned int pickOriginX;       // pick origin
+    unsigned int pickOriginY;       // pick origin
+    unsigned int dummy1;            // dummy
     unsigned int dummy2;            // dummy
 
-    XMFLOAT4 pickDir;		        // picking vector direction
-    XMFLOAT4 eyePos;		        // eye position
+    XMFLOAT4 pickDir;               // picking vector direction
+    XMFLOAT4 eyePos;                // eye position
 
-    float stiffness;		        // stiffness
-    float damping;			        // damping, negative!
-    float dt;				        // delta time
-    float im;				        // inverse mass of masspoints
+    float stiffness;                // stiffness
+    float damping;                  // damping, negative!
+    float dt;                       // delta time
+    float im;                       // inverse mass of masspoints
 };
 
 struct MASSPOINT
 {
-    XMFLOAT4 oldpos;		        // previous position of masspoint
-    XMFLOAT4 newpos;		        // current position of masspoint
-    XMFLOAT4 acc;			        // masspoint acceleration
-    unsigned int neighbour_same;	// neighbour_data mask in the same volcube
-    unsigned int neighbour_other;	// neighbour_data mask in the other volcube
+    XMFLOAT4 oldpos;                // previous position of masspoint
+    XMFLOAT4 newpos;                // current position of masspoint
+    XMFLOAT4 acc;                   // masspoint acceleration
+    unsigned int neighbour_same;    // neighbour_data mask in the same volcube
+    unsigned int neighbour_other;   // neighbour_data mask in the other volcube
 };
 
 struct PARTICLE
 {
-    XMFLOAT4 pos;			        // model vertex position in world space
-    XMFLOAT4 npos;			        // model vertex normal's end point (normal = (npos-pos))
-    XMFLOAT4 mpid1;			        // model masscube ID (#1)
-    XMFLOAT4 mpid2;			        // model masscube ID (#2)
+    XMFLOAT4 pos;                   // model vertex position in world space
+    XMFLOAT4 npos;                  // model vertex normal's end point (normal = (npos-pos))
+    XMFLOAT4 mpid1;                 // model masscube ID (#1)
+    XMFLOAT4 mpid2;                 // model masscube ID (#2)
 };
 
 struct INDEXER

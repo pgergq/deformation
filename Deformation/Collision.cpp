@@ -107,24 +107,24 @@ BVBoxVector BVHierarchy::sort(MassIDVector masspoints, uint mode){
         /*else*/ if (std::get<0>(masspoints[0]) != -1 && std::get<0>(masspoints[1]) == -1){
             tmp.leftID = std::get<0>(masspoints[0]);
             tmp.rightID = -1;
-            tmp.minX = (std::get<1>(masspoints[0])).newpos.x - g_fCollisionRange;
-            tmp.maxX = (std::get<1>(masspoints[0])).newpos.x + g_fCollisionRange;
-            tmp.minY = (std::get<1>(masspoints[0])).newpos.y - g_fCollisionRange;
-            tmp.maxY = (std::get<1>(masspoints[0])).newpos.y + g_fCollisionRange;
-            tmp.minZ = (std::get<1>(masspoints[0])).newpos.z - g_fCollisionRange;
-            tmp.maxZ = (std::get<1>(masspoints[0])).newpos.z + g_fCollisionRange;
+            tmp.minX = (std::get<1>(masspoints[0])).newpos.x - collisionRangeConstant;
+            tmp.maxX = (std::get<1>(masspoints[0])).newpos.x + collisionRangeConstant;
+            tmp.minY = (std::get<1>(masspoints[0])).newpos.y - collisionRangeConstant;
+            tmp.maxY = (std::get<1>(masspoints[0])).newpos.y + collisionRangeConstant;
+            tmp.minZ = (std::get<1>(masspoints[0])).newpos.z - collisionRangeConstant;
+            tmp.maxZ = (std::get<1>(masspoints[0])).newpos.z + collisionRangeConstant;
         }
 
         // two valid masspoints
         else if (std::get<0>(masspoints[0]) != -1 && std::get<0>(masspoints[1]) != -1){
             tmp.leftID = std::get<0>(masspoints[0]);
             tmp.rightID = std::get<0>(masspoints[1]);
-            tmp.minX = std::min((std::get<1>(masspoints[0])).newpos.x, (std::get<1>(masspoints[1])).newpos.x) - g_fCollisionRange;
-            tmp.maxX = std::max((std::get<1>(masspoints[0])).newpos.x, (std::get<1>(masspoints[1])).newpos.x) + g_fCollisionRange;
-            tmp.minY = std::min((std::get<1>(masspoints[0])).newpos.y, (std::get<1>(masspoints[1])).newpos.y) - g_fCollisionRange;
-            tmp.maxY = std::max((std::get<1>(masspoints[0])).newpos.y, (std::get<1>(masspoints[1])).newpos.y) + g_fCollisionRange;
-            tmp.minZ = std::min((std::get<1>(masspoints[0])).newpos.z, (std::get<1>(masspoints[1])).newpos.z) - g_fCollisionRange;
-            tmp.maxZ = std::max((std::get<1>(masspoints[0])).newpos.z, (std::get<1>(masspoints[1])).newpos.z) + g_fCollisionRange;
+            tmp.minX = std::min((std::get<1>(masspoints[0])).newpos.x, (std::get<1>(masspoints[1])).newpos.x) - collisionRangeConstant;
+            tmp.maxX = std::max((std::get<1>(masspoints[0])).newpos.x, (std::get<1>(masspoints[1])).newpos.x) + collisionRangeConstant;
+            tmp.minY = std::min((std::get<1>(masspoints[0])).newpos.y, (std::get<1>(masspoints[1])).newpos.y) - collisionRangeConstant;
+            tmp.maxY = std::max((std::get<1>(masspoints[0])).newpos.y, (std::get<1>(masspoints[1])).newpos.y) + collisionRangeConstant;
+            tmp.minZ = std::min((std::get<1>(masspoints[0])).newpos.z, (std::get<1>(masspoints[1])).newpos.z) - collisionRangeConstant;
+            tmp.maxZ = std::max((std::get<1>(masspoints[0])).newpos.z, (std::get<1>(masspoints[1])).newpos.z) + collisionRangeConstant;
             
         }
 

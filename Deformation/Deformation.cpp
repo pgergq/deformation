@@ -211,10 +211,10 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
     pcbCS->cubeWidth = VCUBEWIDTH;
     pcbCS->cubeCellSize = cubeCellSize;
     pcbCS->particleCount = particleCount;
-    pcbCS->stiffness = g_fStiffness;
-    pcbCS->damping = g_fDamping;
+    pcbCS->stiffness = stiffnessConstant;
+    pcbCS->damping = dampingConstant;
     pcbCS->dt = fElapsedTime;
-    pcbCS->im = g_fInvMass;
+    pcbCS->im = invMassConstant;
 
     // Send picking data to GPU
     if (isPicking)
@@ -877,7 +877,7 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
     V_RETURN(initRender(pd3dDevice));
 
     // Setup the camera's view parameters
-    XMVECTOR vecEye = XMVectorSet(-g_fSpread * 0, g_fSpread * 0, -g_fSpread * 27, 0.0f);
+    XMVECTOR vecEye = XMVectorSet(-spreadConstant * 0, spreadConstant * 0, -spreadConstant * 27, 0.0f);
     XMVECTOR vecAt = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
     camera.SetViewParams(vecEye, vecAt);
 
