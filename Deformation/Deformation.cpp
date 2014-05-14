@@ -37,101 +37,74 @@ using namespace DirectX;
 // Global variables
 //--------------------------------------------------------------------------------------
 
-// render variables
-CModelViewerCamera                  g_Camera;
-ID3D11VertexShader*                 g_pRenderParticlesVS = nullptr;
-ID3D11GeometryShader*               g_pRenderParticlesGS = nullptr;
-ID3D11PixelShader*                  g_pRenderParticlesPS = nullptr;
-ID3D11PixelShader*                  g_pModelPS1 = nullptr;
-ID3D11PixelShader*                  g_pModelPS2 = nullptr;
-ID3D11SamplerState*                 g_pSampleStateLinear = nullptr;
-ID3D11BlendState*                   g_pBlendingStateParticle = nullptr;
-ID3D11DepthStencilState*            g_pDepthStencilState = nullptr;
-ID3D11ComputeShader*                g_pCompute1CS = nullptr;
-ID3D11ComputeShader*                g_pCompute2CS = nullptr;
-ID3D11Buffer*                       g_pcbCS = nullptr;
-ID3D11ComputeShader*				g_pUdateCS = nullptr;
-ID3D11Buffer*						g_pIndexCube = nullptr;
-ID3D11ShaderResourceView*			g_pIndexCubeRV = nullptr;
-ID3D11Buffer*						g_pVolCube1 = nullptr;
-ID3D11Buffer*						g_pVolCube1c = nullptr;
-ID3D11Buffer*						g_pVolCube2 = nullptr;
-ID3D11Buffer*						g_pVolCube2c = nullptr;
-ID3D11ShaderResourceView*			g_pVolCube1RV = nullptr;
-ID3D11ShaderResourceView*			g_pVolCube1cRV = nullptr;
-ID3D11ShaderResourceView*			g_pVolCube2RV = nullptr;
-ID3D11ShaderResourceView*			g_pVolCube2cRV = nullptr;
-ID3D11UnorderedAccessView*			g_pVolCube1UAV = nullptr;
-ID3D11UnorderedAccessView*			g_pVolCube1cUAV = nullptr;
-ID3D11UnorderedAccessView*			g_pVolCube2UAV = nullptr;
-ID3D11UnorderedAccessView*			g_pVolCube2cUAV = nullptr;
-ID3D11Buffer*                       g_pParticleArray0 = nullptr;
-ID3D11Buffer*                       g_pParticleArray1 = nullptr;
-ID3D11ShaderResourceView*           g_pParticleArrayRV0 = nullptr;
-ID3D11ShaderResourceView*           g_pParticleArrayRV1 = nullptr;
-ID3D11UnorderedAccessView*          g_pParticleArrayUAV0 = nullptr;
-ID3D11UnorderedAccessView*          g_pParticleArrayUAV1 = nullptr;
-ID3D11Texture2D*					g_pModelTex[2] = { nullptr, nullptr };
-ID3D11RenderTargetView*				g_pModelRTV[2] = { nullptr, nullptr };
-ID3D11ShaderResourceView*			g_pModelSRV[2] = { nullptr, nullptr };
-ID3D11Buffer*                       g_pcbGS = nullptr;
-ID3D11ShaderResourceView*           g_pParticleTexRV = nullptr;
+// rendering
+CModelViewerCamera                  camera;
+ID3D11BlendState*                   blendState = nullptr;
+ID3D11DepthStencilState*            depthStencilState = nullptr;
+ID3D11SamplerState*                 samplerState = nullptr;
+ID3D11ShaderResourceView*           particleTextureSRV = nullptr;
+
+// storage & access
+ID3D11Buffer*                       csConstantBuffer = nullptr;
+ID3D11Buffer*                       gsConstantBuffer = nullptr;
+ID3D11Buffer*						indexerBuffer = nullptr;
+ID3D11Buffer*						masscube1Buffer1 = nullptr;
+ID3D11Buffer*						masscube1Buffer2 = nullptr;
+ID3D11Buffer*						masscube2Buffer1 = nullptr;
+ID3D11Buffer*						masscube2Buffer2 = nullptr;
+ID3D11Buffer*                       particleBuffer1 = nullptr;
+ID3D11Buffer*                       particleBuffer2 = nullptr;
+ID3D11RenderTargetView*             pickingRTV1 = nullptr;
+ID3D11RenderTargetView*             pickingRTV2 = nullptr;
+ID3D11ShaderResourceView*			indexerSRV = nullptr;
+ID3D11ShaderResourceView*			masscube1SRV1 = nullptr;
+ID3D11ShaderResourceView*			masscube1SRV2 = nullptr;
+ID3D11ShaderResourceView*			masscube2SRV1 = nullptr;
+ID3D11ShaderResourceView*			masscube2SRV2 = nullptr;
+ID3D11ShaderResourceView*           particleSRV1 = nullptr;
+ID3D11ShaderResourceView*           particleSRV2 = nullptr;
+ID3D11ShaderResourceView*           pickingSRV1 = nullptr;
+ID3D11ShaderResourceView*           pickingSRV2 = nullptr;
+ID3D11Texture2D*                    pickingTexture1 = nullptr;
+ID3D11Texture2D*                    pickingTexture2 = nullptr;
+ID3D11UnorderedAccessView*			masscube1UAV1 = nullptr;
+ID3D11UnorderedAccessView*			masscube1UAV2 = nullptr;
+ID3D11UnorderedAccessView*			masscube2UAV1 = nullptr;
+ID3D11UnorderedAccessView*			masscube2UAV2 = nullptr;
+ID3D11UnorderedAccessView*          particleUAV1 = nullptr;
+ID3D11UnorderedAccessView*          particleUAV2 = nullptr;
+
+// shaders
+ID3D11ComputeShader*                physicsCS1 = nullptr;
+ID3D11ComputeShader*                physicsCS2 = nullptr;
+ID3D11ComputeShader*				updateCS = nullptr;
+ID3D11GeometryShader*               renderGS = nullptr;
+ID3D11PixelShader*                  renderPS = nullptr;
+ID3D11PixelShader*                  pickingPS1 = nullptr;
+ID3D11PixelShader*                  pickingPS2 = nullptr;
+ID3D11VertexShader*                 renderVS = nullptr;
 
 // Scene variables
 std::vector<Deformable>				deformableObjects;				// scene objects
-uint                                objectCount;
-uint                                particleCount;
-uint                                mass1Count;
+uint                                objectCount;					// # of deformable bodies
+uint                                particleCount;					// # of total vertex count
+uint                                mass1Count;						// #s of total masspoints
 uint                                mass2Count;
-uint                                cubeCellSize;
+uint                                cubeCellSize;					// cell size in masscubes
 
 // Window & picking variables
-int									g_nWindowWidth = 800;
-int									g_nWindowHeight = 600;
-int									g_nCurrentMouseX;
-int									g_nCurrentMouseY;
-int									g_nPickOriginX;
-int									g_nPickOriginY;
-bool								g_bPicking = false;				// RBUTTON is pressed
-bool								g_bRM2Texture = false;			// render model to texture for picking
-XMFLOAT4							g_vLightPosition(0, 0, -10000, 1);// light position
+int									windowWidth = 800;
+int									windowHeight = 600;
+int									mouseClickX;
+int									mouseClickY;
+int									pickOriginX;
+int									pickOriginY;
+bool								isPicking = false;				// RBUTTON is pressed
+bool								renderPicking = false;			// render model to texture for picking
+XMFLOAT4							lightPos(0, 0, -10000, 1);		// light position
 
 // Debug file
 std::ofstream						debug;
-
-struct PARTICLE_VERTEX
-{
-    XMFLOAT4 Color;
-};
-
-struct CB_GS
-{
-    XMFLOAT4X4 m_WorldViewProj;
-    XMFLOAT4X4 m_InvView;
-    XMFLOAT4 eyepos;
-    XMFLOAT4 lightpos;
-};
-
-struct CB_CS
-{
-    UINT vcwidth;			// number of masspoint in the smaller volcube in one row
-    UINT vccell;			// size of one volcube cell
-    UINT numparticles;		// total count of model vertices
-
-    UINT is_picking;		// bool for mouse picking
-    UINT pickOriginX;		// pickorigin
-    UINT pickOriginY;		// pickorigin
-    UINT dummy1;			// dummy
-    UINT dummy2;
-
-    XMFLOAT4 pickDir;		// picking vector direction
-    XMFLOAT4 eyePos;		// eye position
-
-    float stiffness;		// stiffness
-    float damping;			// damping, negative!
-    float dt;				// delta time
-    float im;				// inverse mass of masspoints
-};
 
 
 //--------------------------------------------------------------------------------------
@@ -221,61 +194,61 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
 
     //--------------------------------------------------------------------------------------
     // EXECUTE FIRST COMPUTE SHADER: UPDATE VOLUMETRIC MODELS
-    pd3dImmediateContext->CSSetShader(g_pCompute1CS, nullptr, 0);
+    pd3dImmediateContext->CSSetShader(physicsCS1, nullptr, 0);
 
-    ID3D11ShaderResourceView* srvs[4] = { g_pVolCube1cRV, g_pVolCube2cRV, g_pModelSRV[0], g_pModelSRV[1] };
+    ID3D11ShaderResourceView* srvs[4] = { masscube1SRV2, masscube2SRV2, pickingSRV1, pickingSRV2 };
     pd3dImmediateContext->CSSetShaderResources(0, 4, srvs);
 
-    ID3D11UnorderedAccessView* aUAViews[2] = { g_pVolCube1UAV, g_pVolCube2UAV };
+    ID3D11UnorderedAccessView* aUAViews[2] = { masscube1UAV1, masscube2UAV1 };
     pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, aUAViews, (UINT*)(&aUAViews));
 
     // For CS constant buffer
     D3D11_MAPPED_SUBRESOURCE MappedResource;
-    V(pd3dImmediateContext->Map(g_pcbCS, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource));
-    CB_CS* pcbCS = (CB_CS*)MappedResource.pData;
+    V(pd3dImmediateContext->Map(csConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource));
+    auto pcbCS = reinterpret_cast<CB_CS*>(MappedResource.pData);
 
     // Update CS constant buffer
-    pcbCS->vcwidth = VCUBEWIDTH;
-    pcbCS->vccell = cubeCellSize;
-    pcbCS->numparticles = particleCount;
+    pcbCS->cubeWidth = VCUBEWIDTH;
+    pcbCS->cubeCellSize = cubeCellSize;
+    pcbCS->particleCount = particleCount;
     pcbCS->stiffness = g_fStiffness;
     pcbCS->damping = g_fDamping;
     pcbCS->dt = fElapsedTime;
     pcbCS->im = g_fInvMass;
 
     // Send picking data to GPU
-    if (g_bPicking)
-        pcbCS->is_picking = 1;
+    if (isPicking)
+        pcbCS->isPicking = 1;
     else
-        pcbCS->is_picking = 0;
+        pcbCS->isPicking = 0;
 
-    XMMATRIX view = g_Camera.GetViewMatrix();    // V matrix
-    XMMATRIX proj = g_Camera.GetProjMatrix();    // P matrix
-    XMVECTOR eye = g_Camera.GetEyePt();          // eye pos
+    XMMATRIX view = camera.GetViewMatrix();    // V matrix
+    XMMATRIX proj = camera.GetProjMatrix();    // P matrix
+    XMVECTOR eye = camera.GetEyePt();          // eye pos
 
     XMMATRIX viewproj = XMMatrixMultiply(view, proj);    // VP matrix
     XMMATRIX trans = XMMatrixTranslation(XMVectorGetX(eye), XMVectorGetY(eye), XMVectorGetZ(eye));    // E matrix
 
-    XMVECTOR pickdir = XMVectorSet((float)((2.0f*g_nCurrentMouseX) / g_nWindowWidth) - 1.0f,
-        (-1)*((float)((2.0f*g_nCurrentMouseY) / g_nWindowHeight) - 1.0f), 0, 1);             // current mouse ndc
+    XMVECTOR pickdir = XMVectorSet((float)((2.0f*mouseClickX) / windowWidth) - 1.0f,
+        (-1)*((float)((2.0f*mouseClickY) / windowHeight) - 1.0f), 0, 1);             // current mouse ndc
     trans = XMMatrixInverse(nullptr, XMMatrixMultiply(trans, viewproj));                     // (E*VP)^-1
     pickdir = XMVector3Normalize(XMVector4Transform(pickdir, trans));                        // pick direction = cmouse_ndc * (E*VP)^-1  --> normalized
     XMVectorSetW(pickdir, 1.0f);
 
-    pcbCS->pickOriginX = g_nPickOriginX;
-    pcbCS->pickOriginY = g_nPickOriginY;
+    pcbCS->pickOriginX = pickOriginX;
+    pcbCS->pickOriginY = pickOriginY;
     XMStoreFloat4(&pcbCS->pickDir, pickdir);
     XMStoreFloat4(&pcbCS->eyePos, eye);
 
-    pd3dImmediateContext->Unmap(g_pcbCS, 0);
-    ID3D11Buffer* ppCB[1] = { g_pcbCS };
+    pd3dImmediateContext->Unmap(csConstantBuffer, 0);
+    ID3D11Buffer* ppCB[1] = { csConstantBuffer };
     pd3dImmediateContext->CSSetConstantBuffers(0, 1, ppCB);
 
     // Run first CS (first volcube)
     pd3dImmediateContext->Dispatch(VCUBEWIDTH, VCUBEWIDTH, VCUBEWIDTH * objectCount);
 
     // Run second CS (second volcube)
-    pd3dImmediateContext->CSSetShader(g_pCompute2CS, nullptr, 0);
+    pd3dImmediateContext->CSSetShader(physicsCS2, nullptr, 0);
     pd3dImmediateContext->Dispatch((VCUBEWIDTH + 1), (VCUBEWIDTH + 1), (VCUBEWIDTH + 1) * objectCount);
 
     // Unbind resources for CS
@@ -286,20 +259,20 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
     pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, ppUAViewNULL, (UINT*)(&aUAViews));
 
     // SWAP resources
-    std::swap(g_pVolCube1, g_pVolCube1c);
-    std::swap(g_pVolCube1RV, g_pVolCube1cRV);
-    std::swap(g_pVolCube1UAV, g_pVolCube1cUAV);
-    std::swap(g_pVolCube2, g_pVolCube2c);
-    std::swap(g_pVolCube2RV, g_pVolCube2cRV);
-    std::swap(g_pVolCube2UAV, g_pVolCube2cUAV);
+    std::swap(masscube1Buffer1, masscube1Buffer2);
+    std::swap(masscube1SRV1, masscube1SRV2);
+    std::swap(masscube1UAV1, masscube1UAV2);
+    std::swap(masscube2Buffer1, masscube2Buffer2);
+    std::swap(masscube2SRV1, masscube2SRV2);
+    std::swap(masscube2UAV1, masscube2UAV2);
 
     //--------------------------------------------------------------------------------------
     // EXECUTE SECOND COMPUTE SHADER: UPDATE POSITIONS
-    pd3dImmediateContext->CSSetShader(g_pUdateCS, nullptr, 0);
+    pd3dImmediateContext->CSSetShader(updateCS, nullptr, 0);
 
-    ID3D11ShaderResourceView* uaRViews[1] = { g_pIndexCubeRV };
+    ID3D11ShaderResourceView* uaRViews[1] = { indexerSRV };
     pd3dImmediateContext->CSSetShaderResources(0, 1, uaRViews);
-    ID3D11UnorderedAccessView* uaUAViews[3] = { g_pParticleArrayUAV1, g_pVolCube1UAV, g_pVolCube2UAV };
+    ID3D11UnorderedAccessView* uaUAViews[3] = { particleUAV2, masscube1UAV1, masscube2UAV1 };
     pd3dImmediateContext->CSSetUnorderedAccessViews(0, 3, uaUAViews, (UINT*)(&uaUAViews));
 
     //pd3dImmediateContext->Dispatch(g_nNumParticles, 1, 1);
@@ -311,12 +284,12 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
     pd3dImmediateContext->CSSetShaderResources(0, 1, uppSRVNULL);
 
     // SWAP RESOURCES
-    std::swap(g_pParticleArray0, g_pParticleArray1);
-    std::swap(g_pParticleArrayRV0, g_pParticleArrayRV1);
-    std::swap(g_pParticleArrayUAV0, g_pParticleArrayUAV1);
+    std::swap(particleBuffer1, particleBuffer2);
+    std::swap(particleSRV1, particleSRV2);
+    std::swap(particleUAV1, particleUAV2);
 
     // Update the camera's position based on user input 
-    g_Camera.FrameMove(fElapsedTime);
+    camera.FrameMove(fElapsedTime);
 }
 
 //--------------------------------------------------------------------------------------
@@ -351,8 +324,6 @@ void print_debug_string(std::string out)
     OutputDebugString(b.c_str());
 }
 
-
-
 //--------------------------------------------------------------------------------------
 // Handle messages (first: button overrides, second: DXUT camera)
 //--------------------------------------------------------------------------------------
@@ -360,23 +331,23 @@ LRESULT CALLBACK MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, boo
 
     // Picking settings
     if (uMsg == WM_RBUTTONDOWN){
-        g_bPicking = true;
-        g_bRM2Texture = true;
-        g_nPickOriginX = (short)LOWORD(lParam);
-        g_nPickOriginY = (short)HIWORD(lParam);
-        g_nCurrentMouseX = (short)LOWORD(lParam);
-        g_nCurrentMouseY = (short)HIWORD(lParam);
+        isPicking = true;
+        renderPicking = true;
+        pickOriginX = (short)LOWORD(lParam);
+        pickOriginY = (short)HIWORD(lParam);
+        mouseClickX = (short)LOWORD(lParam);
+        mouseClickY = (short)HIWORD(lParam);
     }
     else if (uMsg == WM_MOUSEMOVE){
-        g_nCurrentMouseX = (short)LOWORD(lParam);
-        g_nCurrentMouseY = (short)HIWORD(lParam);
+        mouseClickX = (short)LOWORD(lParam);
+        mouseClickY = (short)HIWORD(lParam);
     }
     else if (uMsg == WM_RBUTTONUP){
-        g_bPicking = false;
+        isPicking = false;
     }
 
     // Pass all windows messages to camera so it can respond to user input
-    g_Camera.HandleMessages(hWnd, uMsg, wParam, lParam);
+    camera.HandleMessages(hWnd, uMsg, wParam, lParam);
 
     return 0;
 }
@@ -386,54 +357,54 @@ LRESULT CALLBACK MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, boo
 //------------------------------------------------------
 void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserContext)
 {
-    XMVECTOR lookat = g_Camera.GetLookAtPt();
+    XMVECTOR lookat = camera.GetLookAtPt();
     XMVECTOR eye = XMVectorSet(0, 0, 0, 0);
     XMVECTOR x = XMVectorSet(200, 0, 0, 0);
     XMVECTOR y = XMVectorSet(0, 200, 0, 0);
     XMVECTOR v;
     switch (nChar){
         case VK_LEFT:
-            v = XMVectorSubtract(g_Camera.GetEyePt(), x);
+            v = XMVectorSubtract(camera.GetEyePt(), x);
             XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
-            g_Camera.SetViewParams(eye, lookat);
+            camera.SetViewParams(eye, lookat);
             break;
         case VK_RIGHT:
-            v = XMVectorAdd(g_Camera.GetEyePt(), x);
+            v = XMVectorAdd(camera.GetEyePt(), x);
             XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
-            g_Camera.SetViewParams(eye, lookat);
+            camera.SetViewParams(eye, lookat);
             break;
         case VK_UP:
-            v = XMVectorAdd(g_Camera.GetEyePt(), y);
+            v = XMVectorAdd(camera.GetEyePt(), y);
             XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
-            g_Camera.SetViewParams(eye, lookat);
+            camera.SetViewParams(eye, lookat);
             break;
         case VK_DOWN:
-            v = XMVectorSubtract(g_Camera.GetEyePt(), y);
+            v = XMVectorSubtract(camera.GetEyePt(), y);
             XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
-            g_Camera.SetViewParams(eye, lookat);
+            camera.SetViewParams(eye, lookat);
             break;
         case 0x58:    // 'X' key
         {
-            SAFE_RELEASE(g_pParticleArray0);
-            SAFE_RELEASE(g_pParticleArray1);
-            SAFE_RELEASE(g_pParticleArrayRV0);
-            SAFE_RELEASE(g_pParticleArrayRV1);
-            SAFE_RELEASE(g_pParticleArrayUAV0);
-            SAFE_RELEASE(g_pParticleArrayUAV1);
-            SAFE_RELEASE(g_pIndexCube);
-            SAFE_RELEASE(g_pIndexCubeRV);
-            SAFE_RELEASE(g_pVolCube1);
-            SAFE_RELEASE(g_pVolCube1c);
-            SAFE_RELEASE(g_pVolCube1RV);
-            SAFE_RELEASE(g_pVolCube1cRV);
-            SAFE_RELEASE(g_pVolCube1UAV);
-            SAFE_RELEASE(g_pVolCube1cUAV);
-            SAFE_RELEASE(g_pVolCube2);
-            SAFE_RELEASE(g_pVolCube2c);
-            SAFE_RELEASE(g_pVolCube2RV);
-            SAFE_RELEASE(g_pVolCube2cRV);
-            SAFE_RELEASE(g_pVolCube2UAV);
-            SAFE_RELEASE(g_pVolCube2cUAV);
+            SAFE_RELEASE(particleBuffer1);
+            SAFE_RELEASE(particleBuffer2);
+            SAFE_RELEASE(particleSRV1);
+            SAFE_RELEASE(particleSRV2);
+            SAFE_RELEASE(particleUAV1);
+            SAFE_RELEASE(particleUAV2);
+            SAFE_RELEASE(indexerBuffer);
+            SAFE_RELEASE(indexerSRV);
+            SAFE_RELEASE(masscube1Buffer1);
+            SAFE_RELEASE(masscube1Buffer2);
+            SAFE_RELEASE(masscube1SRV1);
+            SAFE_RELEASE(masscube1SRV2);
+            SAFE_RELEASE(masscube1UAV1);
+            SAFE_RELEASE(masscube1UAV2);
+            SAFE_RELEASE(masscube2Buffer1);
+            SAFE_RELEASE(masscube2Buffer2);
+            SAFE_RELEASE(masscube2SRV1);
+            SAFE_RELEASE(masscube2SRV2);
+            SAFE_RELEASE(masscube2UAV1);
+            SAFE_RELEASE(masscube2UAV2);
             initBuffers(DXUTGetD3D11Device());
             break;
         }
@@ -468,6 +439,12 @@ HRESULT importFiles(){
     body2.translate(1000, 0, 0);
     deformableObjects.push_back(body2);
 
+    //set up third bunny
+    //Deformable body3("bunny_res3_scaled.obj", 2);
+    //body3.build();
+    //body3.translate(0, 2000, 0);
+    //deformableObjects.push_back(body3);
+
     // Set variables
     objectCount = deformableObjects.size();
     particleCount = mass1Count = mass2Count = 0;
@@ -483,12 +460,6 @@ HRESULT importFiles(){
     for (uint i = 0; i < objectCount; i++){
         deformableObjects[i].initCollisionDetection();
     }
-
-    /// debug
-    print_debug_float(mass1Count);
-    print_debug_float(mass2Count);
-    print_debug_float(objectCount);
-    /// debug
 
     return S_OK;
 }
@@ -519,29 +490,29 @@ HRESULT initShaders(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediate
     V_RETURN(DXUTCompileFromFile(L"PosUpdate.hlsl", nullptr, "PosUpdate", "cs_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobUpdateCS));
 
 
-    V_RETURN(pd3dDevice->CreateVertexShader(pBlobRenderParticlesVS->GetBufferPointer(), pBlobRenderParticlesVS->GetBufferSize(), nullptr, &g_pRenderParticlesVS));
-    DXUT_SetDebugName(g_pRenderParticlesVS, "VSParticleDraw");
+    V_RETURN(pd3dDevice->CreateVertexShader(pBlobRenderParticlesVS->GetBufferPointer(), pBlobRenderParticlesVS->GetBufferSize(), nullptr, &renderVS));
+    DXUT_SetDebugName(renderVS, "VSParticleDraw");
 
-    V_RETURN(pd3dDevice->CreateGeometryShader(pBlobRenderParticlesGS->GetBufferPointer(), pBlobRenderParticlesGS->GetBufferSize(), nullptr, &g_pRenderParticlesGS));
-    DXUT_SetDebugName(g_pRenderParticlesGS, "GSParticleDraw");
+    V_RETURN(pd3dDevice->CreateGeometryShader(pBlobRenderParticlesGS->GetBufferPointer(), pBlobRenderParticlesGS->GetBufferSize(), nullptr, &renderGS));
+    DXUT_SetDebugName(renderGS, "GSParticleDraw");
 
-    V_RETURN(pd3dDevice->CreatePixelShader(pBlobRenderParticlesPS->GetBufferPointer(), pBlobRenderParticlesPS->GetBufferSize(), nullptr, &g_pRenderParticlesPS));
-    DXUT_SetDebugName(g_pRenderParticlesPS, "PSParticleDraw");
+    V_RETURN(pd3dDevice->CreatePixelShader(pBlobRenderParticlesPS->GetBufferPointer(), pBlobRenderParticlesPS->GetBufferSize(), nullptr, &renderPS));
+    DXUT_SetDebugName(renderPS, "PSParticleDraw");
 
-    V_RETURN(pd3dDevice->CreatePixelShader(pBlobModelPS1->GetBufferPointer(), pBlobModelPS1->GetBufferSize(), nullptr, &g_pModelPS1));
-    DXUT_SetDebugName(g_pModelPS1, "PSModelDraw1");
+    V_RETURN(pd3dDevice->CreatePixelShader(pBlobModelPS1->GetBufferPointer(), pBlobModelPS1->GetBufferSize(), nullptr, &pickingPS1));
+    DXUT_SetDebugName(pickingPS1, "PSModelDraw1");
 
-    V_RETURN(pd3dDevice->CreatePixelShader(pBlobModelPS2->GetBufferPointer(), pBlobModelPS2->GetBufferSize(), nullptr, &g_pModelPS2));
-    DXUT_SetDebugName(g_pModelPS2, "PSModelDraw2");
+    V_RETURN(pd3dDevice->CreatePixelShader(pBlobModelPS2->GetBufferPointer(), pBlobModelPS2->GetBufferSize(), nullptr, &pickingPS2));
+    DXUT_SetDebugName(pickingPS2, "PSModelDraw2");
 
-    V_RETURN(pd3dDevice->CreateComputeShader(pBlobCalc1CS->GetBufferPointer(), pBlobCalc1CS->GetBufferSize(), nullptr, &g_pCompute1CS));
-    DXUT_SetDebugName(g_pCompute1CS, "CSMain1");
+    V_RETURN(pd3dDevice->CreateComputeShader(pBlobCalc1CS->GetBufferPointer(), pBlobCalc1CS->GetBufferSize(), nullptr, &physicsCS1));
+    DXUT_SetDebugName(physicsCS1, "CSMain1");
 
-    V_RETURN(pd3dDevice->CreateComputeShader(pBlobCalc2CS->GetBufferPointer(), pBlobCalc2CS->GetBufferSize(), nullptr, &g_pCompute2CS));
-    DXUT_SetDebugName(g_pCompute2CS, "CSMain2");
+    V_RETURN(pd3dDevice->CreateComputeShader(pBlobCalc2CS->GetBufferPointer(), pBlobCalc2CS->GetBufferSize(), nullptr, &physicsCS2));
+    DXUT_SetDebugName(physicsCS2, "CSMain2");
 
-    V_RETURN(pd3dDevice->CreateComputeShader(pBlobUpdateCS->GetBufferPointer(), pBlobUpdateCS->GetBufferSize(), nullptr, &g_pUdateCS));
-    DXUT_SetDebugName(g_pUdateCS, "PosUpdate");
+    V_RETURN(pd3dDevice->CreateComputeShader(pBlobUpdateCS->GetBufferPointer(), pBlobUpdateCS->GetBufferSize(), nullptr, &updateCS));
+    DXUT_SetDebugName(updateCS, "PosUpdate");
 
     // No vertex buffer necessary, particle data is read from an SRV
     pd3dImmediateContext->IASetInputLayout(nullptr);
@@ -639,10 +610,10 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     // Set initial Particles data
     D3D11_SUBRESOURCE_DATA InitData;
     InitData.pSysMem = pData1;
-    V_RETURN(pd3dDevice->CreateBuffer(&desc, &InitData, &g_pParticleArray0));
-    V_RETURN(pd3dDevice->CreateBuffer(&desc, &InitData, &g_pParticleArray1));
-    DXUT_SetDebugName(g_pParticleArray0, "ParticleArray0");
-    DXUT_SetDebugName(g_pParticleArray1, "ParticleArray1");
+    V_RETURN(pd3dDevice->CreateBuffer(&desc, &InitData, &particleBuffer1));
+    V_RETURN(pd3dDevice->CreateBuffer(&desc, &InitData, &particleBuffer2));
+    DXUT_SetDebugName(particleBuffer1, "ParticleBuffer1");
+    DXUT_SetDebugName(particleBuffer2, "ParticleBuffer2");
     SAFE_DELETE_ARRAY(pData1);
 
     ///Set initial Volumetric data
@@ -650,16 +621,16 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     v1data.pSysMem = vData1;
     D3D11_SUBRESOURCE_DATA v2data;
     v2data.pSysMem = vData2;
-    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v1data, &g_pVolCube1));
-    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v1data, &g_pVolCube1c));
-    DXUT_SetDebugName(g_pVolCube1, "VolCube1");
-    DXUT_SetDebugName(g_pVolCube1c, "VolCube1c");
+    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v1data, &masscube1Buffer1));
+    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v1data, &masscube1Buffer2));
+    DXUT_SetDebugName(masscube1Buffer1, "VolCube1");
+    DXUT_SetDebugName(masscube1Buffer2, "VolCube1c");
     SAFE_DELETE_ARRAY(vData1);
     vdesc.ByteWidth = mass2Count * sizeof(MASSPOINT);
-    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v2data, &g_pVolCube2));
-    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v2data, &g_pVolCube2c));
-    DXUT_SetDebugName(g_pVolCube2, "VolCube2");
-    DXUT_SetDebugName(g_pVolCube2c, "VolCube2c");
+    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v2data, &masscube2Buffer1));
+    V_RETURN(pd3dDevice->CreateBuffer(&vdesc, &v2data, &masscube2Buffer2));
+    DXUT_SetDebugName(masscube2Buffer1, "VolCube2");
+    DXUT_SetDebugName(masscube2Buffer2, "VolCube2c");
     SAFE_DELETE_ARRAY(vData2);
 
 
@@ -673,8 +644,8 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     desc2.Usage = D3D11_USAGE_DEFAULT;
     D3D11_SUBRESOURCE_DATA indexer_init;
     indexer_init.pSysMem = iData1;
-    V_RETURN(pd3dDevice->CreateBuffer(&desc2, &indexer_init, &g_pIndexCube));
-    DXUT_SetDebugName(g_pIndexCube, "IndexCube");
+    V_RETURN(pd3dDevice->CreateBuffer(&desc2, &indexer_init, &indexerBuffer));
+    DXUT_SetDebugName(indexerBuffer, "IndexCube");
     SAFE_DELETE_ARRAY(iData1);
 
     /// RV for Particle data
@@ -684,10 +655,10 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     DescRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     DescRV.Buffer.FirstElement = 0;
     DescRV.Buffer.NumElements = particleCount;
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pParticleArray0, &DescRV, &g_pParticleArrayRV0));
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pParticleArray1, &DescRV, &g_pParticleArrayRV1));
-    DXUT_SetDebugName(g_pParticleArrayRV0, "ParticleArray0 SRV");
-    DXUT_SetDebugName(g_pParticleArrayRV1, "ParticleArray1 SRV");
+    V_RETURN(pd3dDevice->CreateShaderResourceView(particleBuffer1, &DescRV, &particleSRV1));
+    V_RETURN(pd3dDevice->CreateShaderResourceView(particleBuffer2, &DescRV, &particleSRV2));
+    DXUT_SetDebugName(particleSRV1, "ParticleArray0 SRV");
+    DXUT_SetDebugName(particleSRV2, "ParticleArray1 SRV");
 
     /// SRV for indexcube
     D3D11_SHADER_RESOURCE_VIEW_DESC DescRV2;
@@ -696,8 +667,8 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     DescRV2.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     DescRV2.Buffer.FirstElement = 0;
     DescRV2.Buffer.NumElements = particleCount;
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pIndexCube, &DescRV2, &g_pIndexCubeRV));
-    DXUT_SetDebugName(g_pIndexCubeRV, "IndexCube SRV");
+    V_RETURN(pd3dDevice->CreateShaderResourceView(indexerBuffer, &DescRV2, &indexerSRV));
+    DXUT_SetDebugName(indexerSRV, "IndexCube SRV");
 
     /// SRV for VolCubes
     D3D11_SHADER_RESOURCE_VIEW_DESC DescRVV;
@@ -706,15 +677,15 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     DescRVV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     DescRVV.Buffer.FirstElement = 0;
     DescRVV.Buffer.NumElements = mass1Count;
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube1, &DescRVV, &g_pVolCube1RV));
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube1c, &DescRVV, &g_pVolCube1cRV));
-    DXUT_SetDebugName(g_pVolCube1RV, "VolCube1 RV");
-    DXUT_SetDebugName(g_pVolCube1cRV, "VolCube1c RV");
+    V_RETURN(pd3dDevice->CreateShaderResourceView(masscube1Buffer1, &DescRVV, &masscube1SRV1));
+    V_RETURN(pd3dDevice->CreateShaderResourceView(masscube1Buffer2, &DescRVV, &masscube1SRV2));
+    DXUT_SetDebugName(masscube1SRV1, "VolCube1 RV");
+    DXUT_SetDebugName(masscube1SRV2, "VolCube1c RV");
     DescRVV.Buffer.NumElements = mass2Count;
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube2, &DescRVV, &g_pVolCube2RV));
-    V_RETURN(pd3dDevice->CreateShaderResourceView(g_pVolCube2c, &DescRVV, &g_pVolCube2cRV));
-    DXUT_SetDebugName(g_pVolCube2RV, "VolCube2 RV");
-    DXUT_SetDebugName(g_pVolCube2cRV, "VolCube2c RV");
+    V_RETURN(pd3dDevice->CreateShaderResourceView(masscube2Buffer1, &DescRVV, &masscube2SRV1));
+    V_RETURN(pd3dDevice->CreateShaderResourceView(masscube2Buffer2, &DescRVV, &masscube2SRV2));
+    DXUT_SetDebugName(masscube2SRV1, "VolCube2 RV");
+    DXUT_SetDebugName(masscube2SRV2, "VolCube2c RV");
 
     /// UAV for Particle data
     D3D11_UNORDERED_ACCESS_VIEW_DESC DescUAV;
@@ -723,10 +694,10 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     DescUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
     DescUAV.Buffer.FirstElement = 0;
     DescUAV.Buffer.NumElements = particleCount;
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pParticleArray0, &DescUAV, &g_pParticleArrayUAV0));
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pParticleArray1, &DescUAV, &g_pParticleArrayUAV1));
-    DXUT_SetDebugName(g_pParticleArrayUAV0, "ParticleArray0 UAV");
-    DXUT_SetDebugName(g_pParticleArrayUAV1, "ParticleArray1 UAV");
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(particleBuffer1, &DescUAV, &particleUAV1));
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(particleBuffer2, &DescUAV, &particleUAV2));
+    DXUT_SetDebugName(particleUAV1, "ParticleArray0 UAV");
+    DXUT_SetDebugName(particleUAV2, "ParticleArray1 UAV");
 
     /// UAVs for Volumetric data
     D3D11_UNORDERED_ACCESS_VIEW_DESC vDescUAV;
@@ -735,15 +706,15 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     vDescUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
     vDescUAV.Buffer.FirstElement = 0;
     vDescUAV.Buffer.NumElements = mass1Count;
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube1, &vDescUAV, &g_pVolCube1UAV));
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube1c, &vDescUAV, &g_pVolCube1cUAV));
-    DXUT_SetDebugName(g_pVolCube1UAV, "VolCube1 UAV");
-    DXUT_SetDebugName(g_pVolCube1cUAV, "VolCube1c UAV");
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(masscube1Buffer1, &vDescUAV, &masscube1UAV1));
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(masscube1Buffer2, &vDescUAV, &masscube1UAV2));
+    DXUT_SetDebugName(masscube1UAV1, "VolCube1 UAV");
+    DXUT_SetDebugName(masscube1UAV2, "VolCube1c UAV");
     vDescUAV.Buffer.NumElements = mass2Count;
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube2, &vDescUAV, &g_pVolCube2UAV));
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(g_pVolCube2c, &vDescUAV, &g_pVolCube2cUAV));
-    DXUT_SetDebugName(g_pVolCube2UAV, "VolCube2 UAV");
-    DXUT_SetDebugName(g_pVolCube2cUAV, "VolCube2c UAV");
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(masscube2Buffer1, &vDescUAV, &masscube2UAV1));
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(masscube2Buffer2, &vDescUAV, &masscube2UAV2));
+    DXUT_SetDebugName(masscube2UAV1, "VolCube2 UAV");
+    DXUT_SetDebugName(masscube2UAV2, "VolCube2c UAV");
 
     return hr;
 }
@@ -762,16 +733,16 @@ HRESULT initRender(ID3D11Device* pd3dDevice){
     Desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     Desc.MiscFlags = 0;
     Desc.ByteWidth = sizeof(CB_GS);
-    V_RETURN(pd3dDevice->CreateBuffer(&Desc, nullptr, &g_pcbGS));
-    DXUT_SetDebugName(g_pcbGS, "CB_GS");
+    V_RETURN(pd3dDevice->CreateBuffer(&Desc, nullptr, &gsConstantBuffer));
+    DXUT_SetDebugName(gsConstantBuffer, "CB_GS");
 
     Desc.ByteWidth = sizeof(CB_CS);
-    V_RETURN(pd3dDevice->CreateBuffer(&Desc, nullptr, &g_pcbCS));
-    DXUT_SetDebugName(g_pcbCS, "CB_CS");
+    V_RETURN(pd3dDevice->CreateBuffer(&Desc, nullptr, &csConstantBuffer));
+    DXUT_SetDebugName(csConstantBuffer, "CB_CS");
 
     // Load Particle Texture
-    V_RETURN(DXUTCreateShaderResourceViewFromFile(pd3dDevice, L"misc\\Particle.dds", &g_pParticleTexRV));
-    DXUT_SetDebugName(g_pParticleTexRV, "Particle.dds");
+    V_RETURN(DXUTCreateShaderResourceViewFromFile(pd3dDevice, L"misc\\Particle.dds", &particleTextureSRV));
+    DXUT_SetDebugName(particleTextureSRV, "Particle.dds");
 
     // Create sampler
     D3D11_SAMPLER_DESC SamplerDesc;
@@ -780,8 +751,8 @@ HRESULT initRender(ID3D11Device* pd3dDevice){
     SamplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
     SamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
     SamplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-    V_RETURN(pd3dDevice->CreateSamplerState(&SamplerDesc, &g_pSampleStateLinear));
-    DXUT_SetDebugName(g_pSampleStateLinear, "Linear");
+    V_RETURN(pd3dDevice->CreateSamplerState(&SamplerDesc, &samplerState));
+    DXUT_SetDebugName(samplerState, "Linear");
 
     // Create blend
     D3D11_BLEND_DESC BlendStateDesc;
@@ -794,16 +765,16 @@ HRESULT initRender(ID3D11Device* pd3dDevice){
     BlendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ZERO;
     BlendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
     BlendStateDesc.RenderTarget[0].RenderTargetWriteMask = 0x0F;
-    V_RETURN(pd3dDevice->CreateBlendState(&BlendStateDesc, &g_pBlendingStateParticle));
-    DXUT_SetDebugName(g_pBlendingStateParticle, "Blending");
+    V_RETURN(pd3dDevice->CreateBlendState(&BlendStateDesc, &blendState));
+    DXUT_SetDebugName(blendState, "Blending");
 
     // Create depth stencil
     D3D11_DEPTH_STENCIL_DESC DepthStencilDesc;
     ZeroMemory(&DepthStencilDesc, sizeof(DepthStencilDesc));
     DepthStencilDesc.DepthEnable = FALSE;
     DepthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-    pd3dDevice->CreateDepthStencilState(&DepthStencilDesc, &g_pDepthStencilState);
-    DXUT_SetDebugName(g_pDepthStencilState, "DepthOff");
+    pd3dDevice->CreateDepthStencilState(&DepthStencilDesc, &depthStencilState);
+    DXUT_SetDebugName(depthStencilState, "DepthOff");
 
     return S_OK;
 }
@@ -814,12 +785,12 @@ HRESULT initRender(ID3D11Device* pd3dDevice){
 HRESULT initPicking(ID3D11Device* pd3dDevice, int width, int height)
 {
 
-    SAFE_RELEASE(g_pModelTex[0]);
-    SAFE_RELEASE(g_pModelTex[1]);
-    SAFE_RELEASE(g_pModelRTV[0]);
-    SAFE_RELEASE(g_pModelRTV[1]);
-    SAFE_RELEASE(g_pModelSRV[0]);
-    SAFE_RELEASE(g_pModelSRV[1]);
+    SAFE_RELEASE(pickingTexture1);
+    SAFE_RELEASE(pickingTexture2);
+    SAFE_RELEASE(pickingRTV1);
+    SAFE_RELEASE(pickingRTV2);
+    SAFE_RELEASE(pickingSRV1);
+    SAFE_RELEASE(pickingSRV2);
 
     D3D11_TEXTURE2D_DESC tdesc;
     D3D11_RENDER_TARGET_VIEW_DESC rtvdesc;
@@ -837,27 +808,27 @@ HRESULT initPicking(ID3D11Device* pd3dDevice, int width, int height)
     tdesc.CPUAccessFlags = 0;
     tdesc.MiscFlags = 0;
 
-    pd3dDevice->CreateTexture2D(&tdesc, nullptr, &g_pModelTex[0]);
-    DXUT_SetDebugName(g_pModelTex[0], "Model TEX 1");
-    pd3dDevice->CreateTexture2D(&tdesc, nullptr, &g_pModelTex[1]);
-    DXUT_SetDebugName(g_pModelTex[1], "Model TEX 2");
+    pd3dDevice->CreateTexture2D(&tdesc, nullptr, &pickingTexture1);
+    DXUT_SetDebugName(pickingTexture1, "Picking TEX 1");
+    pd3dDevice->CreateTexture2D(&tdesc, nullptr, &pickingTexture2);
+    DXUT_SetDebugName(pickingTexture2, "Picking TEX 2");
 
     rtvdesc.Format = tdesc.Format;
     rtvdesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
     rtvdesc.Texture2D.MipSlice = 0;
-    pd3dDevice->CreateRenderTargetView(g_pModelTex[0], &rtvdesc, &g_pModelRTV[0]);
-    DXUT_SetDebugName(g_pModelRTV[0], "Model RTV 1");
-    pd3dDevice->CreateRenderTargetView(g_pModelTex[1], &rtvdesc, &g_pModelRTV[1]);
-    DXUT_SetDebugName(g_pModelRTV[1], "Model RTV 2");
+    pd3dDevice->CreateRenderTargetView(pickingTexture1, &rtvdesc, &pickingRTV1);
+    DXUT_SetDebugName(pickingRTV1, "Picking RTV 1");
+    pd3dDevice->CreateRenderTargetView(pickingTexture2, &rtvdesc, &pickingRTV2);
+    DXUT_SetDebugName(pickingRTV2, "Picking RTV 2");
 
     srvdesc.Format = tdesc.Format;
     srvdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
     srvdesc.Texture2D.MostDetailedMip = 0;
     srvdesc.Texture2D.MipLevels = 1;
-    pd3dDevice->CreateShaderResourceView(g_pModelTex[0], &srvdesc, &g_pModelSRV[0]);
-    DXUT_SetDebugName(g_pModelSRV[0], "Model SRV 1");
-    pd3dDevice->CreateShaderResourceView(g_pModelTex[1], &srvdesc, &g_pModelSRV[1]);
-    DXUT_SetDebugName(g_pModelSRV[1], "Model SRV 2");
+    pd3dDevice->CreateShaderResourceView(pickingTexture1, &srvdesc, &pickingSRV1);
+    DXUT_SetDebugName(pickingSRV1, "Picking SRV 1");
+    pd3dDevice->CreateShaderResourceView(pickingTexture2, &srvdesc, &pickingSRV2);
+    DXUT_SetDebugName(pickingSRV2, "Picking SRV 2");
 
     return S_OK;
 }
@@ -874,7 +845,7 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
     // Warn the user that in order to support CS4x, a non-hardware device has been created, continue or quit?
     if (DXUTGetDeviceSettings().d3d11.DriverType != D3D_DRIVER_TYPE_HARDWARE && bFirstOnCreateDevice)
     {
-        if (MessageBox(0, L"CS4x capability is missing. "\
+        if (MessageBox(0, L"CS5x capability is missing. "\
             L"In order to continue, a non-hardware device has been created, "\
             L"it will be very slow, continue?", L"Warning", MB_ICONEXCLAMATION | MB_YESNO) != IDYES)
             return E_FAIL;
@@ -908,7 +879,7 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
     // Setup the camera's view parameters
     XMVECTOR vecEye = XMVectorSet(-g_fSpread * 0, g_fSpread * 0, -g_fSpread * 27, 0.0f);
     XMVECTOR vecAt = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
-    g_Camera.SetViewParams(vecEye, vecAt);
+    camera.SetViewParams(vecEye, vecAt);
 
     setUpDialog.DestroyDialog();
 
@@ -923,12 +894,12 @@ HRESULT CALLBACK OnD3D11ResizedSwapChain(ID3D11Device* pd3dDevice, IDXGISwapChai
     HRESULT hr = S_OK;
 
     // Setup the camera's projection parameters
-    g_nWindowWidth = pBackBufferSurfaceDesc->Width;
-    g_nWindowHeight = pBackBufferSurfaceDesc->Height;
+    windowWidth = pBackBufferSurfaceDesc->Width;
+    windowHeight = pBackBufferSurfaceDesc->Height;
     float fAspectRatio = pBackBufferSurfaceDesc->Width / (FLOAT)pBackBufferSurfaceDesc->Height;
-    g_Camera.SetProjParams(XM_PI / 4, fAspectRatio, 10.0f, 500000.0f);
-    g_Camera.SetWindow(pBackBufferSurfaceDesc->Width, pBackBufferSurfaceDesc->Height);
-    g_Camera.SetButtonMasks(0, MOUSE_WHEEL, MOUSE_LEFT_BUTTON | MOUSE_MIDDLE_BUTTON);
+    camera.SetProjParams(XM_PI / 4, fAspectRatio, 10.0f, 500000.0f);
+    camera.SetWindow(pBackBufferSurfaceDesc->Width, pBackBufferSurfaceDesc->Height);
+    camera.SetButtonMasks(0, MOUSE_WHEEL, MOUSE_LEFT_BUTTON | MOUSE_MIDDLE_BUTTON);
 
     initPicking(pd3dDevice, pBackBufferSurfaceDesc->Width, pBackBufferSurfaceDesc->Height);
 
@@ -944,8 +915,8 @@ bool drawPicking(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
     ID3D11RenderTargetView* pRTV = DXUTGetD3D11RenderTargetView();
     ID3D11DepthStencilView* pDSV = DXUTGetD3D11DepthStencilView();
     pd3dImmediateContext->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1.0, 0);
-    pd3dImmediateContext->OMSetRenderTargets(1, &g_pModelRTV[0], pDSV);
-    pd3dImmediateContext->ClearRenderTargetView(g_pModelRTV[0], Colors::Black);
+    pd3dImmediateContext->OMSetRenderTargets(1, &pickingRTV1, pDSV);
+    pd3dImmediateContext->ClearRenderTargetView(pickingRTV1, Colors::Black);
 
     ID3D11BlendState *pBlendState0 = nullptr;
     ID3D11DepthStencilState *pDepthStencilState0 = nullptr;
@@ -954,28 +925,28 @@ bool drawPicking(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
     pd3dImmediateContext->OMGetBlendState(&pBlendState0, &BlendFactor0.x, &SampleMask0);
     pd3dImmediateContext->OMGetDepthStencilState(&pDepthStencilState0, &StencilRef0);
 
-    pd3dImmediateContext->VSSetShader(g_pRenderParticlesVS, nullptr, 0);
-    pd3dImmediateContext->GSSetShader(g_pRenderParticlesGS, nullptr, 0);
-    pd3dImmediateContext->PSSetShader(g_pModelPS1, nullptr, 0);
+    pd3dImmediateContext->VSSetShader(renderVS, nullptr, 0);
+    pd3dImmediateContext->GSSetShader(renderGS, nullptr, 0);
+    pd3dImmediateContext->PSSetShader(pickingPS1, nullptr, 0);
 
-    ID3D11ShaderResourceView* aRViews[1] = { g_pParticleArrayRV0 };
+    ID3D11ShaderResourceView* aRViews[1] = { particleSRV1 };
     pd3dImmediateContext->VSSetShaderResources(0, 1, aRViews);
 
     D3D11_MAPPED_SUBRESOURCE MappedResource;
-    pd3dImmediateContext->Map(g_pcbGS, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource);
+    pd3dImmediateContext->Map(gsConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource);
     auto pCBGS = reinterpret_cast<CB_GS*>(MappedResource.pData);
-    XMStoreFloat4x4(&pCBGS->m_WorldViewProj, XMMatrixMultiply(mView, mProj));
-    XMStoreFloat4x4(&pCBGS->m_InvView, XMMatrixInverse(nullptr, mView));
-    XMStoreFloat4(&pCBGS->eyepos, g_Camera.GetEyePt());
-    pCBGS->lightpos = g_vLightPosition;
-    pd3dImmediateContext->Unmap(g_pcbGS, 0);
-    pd3dImmediateContext->GSSetConstantBuffers(0, 1, &g_pcbGS);
+    XMStoreFloat4x4(&pCBGS->worldViewProjection, XMMatrixMultiply(mView, mProj));
+    XMStoreFloat4x4(&pCBGS->inverseView, XMMatrixInverse(nullptr, mView));
+    XMStoreFloat4(&pCBGS->eyePos, camera.GetEyePt());
+    pCBGS->lightPos = lightPos;
+    pd3dImmediateContext->Unmap(gsConstantBuffer, 0);
+    pd3dImmediateContext->GSSetConstantBuffers(0, 1, &gsConstantBuffer);
 
-    pd3dImmediateContext->PSSetShaderResources(0, 1, &g_pParticleTexRV);
-    pd3dImmediateContext->PSSetSamplers(0, 1, &g_pSampleStateLinear);
+    pd3dImmediateContext->PSSetShaderResources(0, 1, &particleTextureSRV);
+    pd3dImmediateContext->PSSetSamplers(0, 1, &samplerState);
 
     pd3dImmediateContext->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
-    pd3dImmediateContext->OMSetDepthStencilState(g_pDepthStencilState, 0);
+    pd3dImmediateContext->OMSetDepthStencilState(depthStencilState, 0);
 
 
     // Render first "layer" of information: vertex IDs in first volcube
@@ -983,9 +954,9 @@ bool drawPicking(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
 
     // Render second layer of information: vertex IDs in second volcube
     pd3dImmediateContext->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1.0, 0);
-    pd3dImmediateContext->OMSetRenderTargets(1, &g_pModelRTV[1], pDSV);
-    pd3dImmediateContext->ClearRenderTargetView(g_pModelRTV[1], Colors::Black);
-    pd3dImmediateContext->PSSetShader(g_pModelPS2, nullptr, 0);
+    pd3dImmediateContext->OMSetRenderTargets(1, &pickingRTV2, pDSV);
+    pd3dImmediateContext->ClearRenderTargetView(pickingRTV2, Colors::Black);
+    pd3dImmediateContext->PSSetShader(pickingPS2, nullptr, 0);
     pd3dImmediateContext->Draw(particleCount, 0);
 
 
@@ -998,7 +969,7 @@ bool drawPicking(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
     pd3dImmediateContext->OMSetDepthStencilState(pDepthStencilState0, StencilRef0); SAFE_RELEASE(pDepthStencilState0);
 
     pd3dImmediateContext->OMSetRenderTargets(1, &pRTV, pDSV);
-    g_bRM2Texture = false;
+    renderPicking = false;
 
     return true;
 }
@@ -1015,29 +986,29 @@ bool drawObjects(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
     pd3dImmediateContext->OMGetBlendState(&pBlendState0, &BlendFactor0.x, &SampleMask0);
     pd3dImmediateContext->OMGetDepthStencilState(&pDepthStencilState0, &StencilRef0);
 
-    pd3dImmediateContext->VSSetShader(g_pRenderParticlesVS, nullptr, 0);
-    pd3dImmediateContext->GSSetShader(g_pRenderParticlesGS, nullptr, 0);
-    pd3dImmediateContext->PSSetShader(g_pRenderParticlesPS, nullptr, 0);
+    pd3dImmediateContext->VSSetShader(renderVS, nullptr, 0);
+    pd3dImmediateContext->GSSetShader(renderGS, nullptr, 0);
+    pd3dImmediateContext->PSSetShader(renderPS, nullptr, 0);
 
-    ID3D11ShaderResourceView* aRViews[1] = { g_pParticleArrayRV0 };
+    ID3D11ShaderResourceView* aRViews[1] = { particleSRV1 };
     pd3dImmediateContext->VSSetShaderResources(0, 1, aRViews);
 
     D3D11_MAPPED_SUBRESOURCE MappedResource;
-    pd3dImmediateContext->Map(g_pcbGS, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource);
+    pd3dImmediateContext->Map(gsConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource);
     auto pCBGS = reinterpret_cast<CB_GS*>(MappedResource.pData);
-    XMStoreFloat4x4(&pCBGS->m_WorldViewProj, XMMatrixMultiply(mView, mProj));
-    XMStoreFloat4x4(&pCBGS->m_InvView, XMMatrixInverse(nullptr, mView));
-    XMStoreFloat4(&pCBGS->eyepos, g_Camera.GetEyePt());
-    pCBGS->lightpos = g_vLightPosition;
-    pd3dImmediateContext->Unmap(g_pcbGS, 0);
-    pd3dImmediateContext->GSSetConstantBuffers(0, 1, &g_pcbGS);
+    XMStoreFloat4x4(&pCBGS->worldViewProjection, XMMatrixMultiply(mView, mProj));
+    XMStoreFloat4x4(&pCBGS->inverseView, XMMatrixInverse(nullptr, mView));
+    XMStoreFloat4(&pCBGS->eyePos, camera.GetEyePt());
+    pCBGS->lightPos = lightPos;
+    pd3dImmediateContext->Unmap(gsConstantBuffer, 0);
+    pd3dImmediateContext->GSSetConstantBuffers(0, 1, &gsConstantBuffer);
 
-    pd3dImmediateContext->PSSetShaderResources(0, 1, &g_pParticleTexRV);
-    pd3dImmediateContext->PSSetSamplers(0, 1, &g_pSampleStateLinear);
+    pd3dImmediateContext->PSSetShaderResources(0, 1, &particleTextureSRV);
+    pd3dImmediateContext->PSSetSamplers(0, 1, &samplerState);
 
     float bf[] = { 0.f, 0.f, 0.f, 0.f };
-    pd3dImmediateContext->OMSetBlendState(g_pBlendingStateParticle, bf, 0xFFFFFFFF);
-    pd3dImmediateContext->OMSetDepthStencilState(g_pDepthStencilState, 0);
+    pd3dImmediateContext->OMSetBlendState(blendState, bf, 0xFFFFFFFF);
+    pd3dImmediateContext->OMSetDepthStencilState(depthStencilState, 0);
 
     pd3dImmediateContext->Draw(particleCount, 0);
 
@@ -1062,11 +1033,11 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
     ID3D11DepthStencilView* pDSV = DXUTGetD3D11DepthStencilView();
     pd3dImmediateContext->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1.0, 0);
 
-    XMMATRIX mView = g_Camera.GetViewMatrix();
-    XMMATRIX mProj = g_Camera.GetProjMatrix();
+    XMMATRIX mView = camera.GetViewMatrix();
+    XMMATRIX mProj = camera.GetProjMatrix();
 
     // Render the model first for picking, only if RMBUTTONDOWN happened
-    if (g_bRM2Texture){
+    if (renderPicking){
         drawPicking(pd3dImmediateContext, mView, mProj);
     }
 
@@ -1090,44 +1061,44 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 void CALLBACK OnD3D11DestroyDevice(void* pUserContext)
 {
     DXUTGetGlobalResourceCache().OnDestroyDevice();
-    SAFE_RELEASE(g_pParticleArray0);
-    SAFE_RELEASE(g_pParticleArray1);
-    SAFE_RELEASE(g_pIndexCube);
-    SAFE_RELEASE(g_pIndexCubeRV);
-    SAFE_RELEASE(g_pVolCube1);
-    SAFE_RELEASE(g_pVolCube1c);
-    SAFE_RELEASE(g_pVolCube2);
-    SAFE_RELEASE(g_pVolCube2c);
-    SAFE_RELEASE(g_pVolCube1RV);
-    SAFE_RELEASE(g_pVolCube1cRV);
-    SAFE_RELEASE(g_pVolCube2RV);
-    SAFE_RELEASE(g_pVolCube2cRV);
-    SAFE_RELEASE(g_pVolCube1UAV);
-    SAFE_RELEASE(g_pVolCube1cUAV);
-    SAFE_RELEASE(g_pVolCube2UAV);
-    SAFE_RELEASE(g_pVolCube2cUAV);
-    SAFE_RELEASE(g_pParticleArrayRV0);
-    SAFE_RELEASE(g_pParticleArrayRV1);
-    SAFE_RELEASE(g_pParticleArrayUAV0);
-    SAFE_RELEASE(g_pParticleArrayUAV1);
-    SAFE_RELEASE(g_pcbGS);
-    SAFE_RELEASE(g_pcbCS);
-    SAFE_RELEASE(g_pParticleTexRV);
-    SAFE_RELEASE(g_pRenderParticlesVS);
-    SAFE_RELEASE(g_pRenderParticlesGS);
-    SAFE_RELEASE(g_pRenderParticlesPS);
-    SAFE_RELEASE(g_pModelPS1);
-    SAFE_RELEASE(g_pModelPS2);
-    SAFE_RELEASE(g_pCompute1CS);
-    SAFE_RELEASE(g_pCompute2CS);
-    SAFE_RELEASE(g_pUdateCS);
-    SAFE_RELEASE(g_pSampleStateLinear);
-    SAFE_RELEASE(g_pBlendingStateParticle);
-    SAFE_RELEASE(g_pDepthStencilState);
-    SAFE_RELEASE(g_pModelTex[0]);
-    SAFE_RELEASE(g_pModelTex[1]);
-    SAFE_RELEASE(g_pModelRTV[0]);
-    SAFE_RELEASE(g_pModelRTV[1]);
-    SAFE_RELEASE(g_pModelSRV[0]);
-    SAFE_RELEASE(g_pModelSRV[1]);
+    SAFE_RELEASE(indexerBuffer);
+    SAFE_RELEASE(particleBuffer1);
+    SAFE_RELEASE(particleBuffer2);
+    SAFE_RELEASE(indexerSRV);
+    SAFE_RELEASE(masscube1Buffer1);
+    SAFE_RELEASE(masscube1Buffer2);
+    SAFE_RELEASE(masscube2Buffer1);
+    SAFE_RELEASE(masscube2Buffer2);
+    SAFE_RELEASE(masscube1SRV1);
+    SAFE_RELEASE(masscube1SRV2);
+    SAFE_RELEASE(masscube2SRV1);
+    SAFE_RELEASE(masscube2SRV2);
+    SAFE_RELEASE(masscube1UAV1);
+    SAFE_RELEASE(masscube1UAV2);
+    SAFE_RELEASE(masscube2UAV1);
+    SAFE_RELEASE(masscube2UAV2);
+    SAFE_RELEASE(particleSRV1);
+    SAFE_RELEASE(particleSRV2);
+    SAFE_RELEASE(particleUAV1);
+    SAFE_RELEASE(particleUAV2);
+    SAFE_RELEASE(csConstantBuffer);
+    SAFE_RELEASE(gsConstantBuffer);
+    SAFE_RELEASE(particleTextureSRV);
+    SAFE_RELEASE(renderVS);
+    SAFE_RELEASE(renderGS);
+    SAFE_RELEASE(renderPS);
+    SAFE_RELEASE(pickingPS1);
+    SAFE_RELEASE(pickingPS2);
+    SAFE_RELEASE(physicsCS1);
+    SAFE_RELEASE(physicsCS2);
+    SAFE_RELEASE(updateCS);
+    SAFE_RELEASE(blendState);
+    SAFE_RELEASE(depthStencilState);
+    SAFE_RELEASE(samplerState);
+    SAFE_RELEASE(pickingTexture1);
+    SAFE_RELEASE(pickingTexture2);
+    SAFE_RELEASE(pickingRTV1);
+    SAFE_RELEASE(pickingRTV2);
+    SAFE_RELEASE(pickingSRV1);
+    SAFE_RELEASE(pickingSRV2);
 }

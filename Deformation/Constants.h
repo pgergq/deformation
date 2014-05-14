@@ -58,46 +58,75 @@ extern float g_fCollisionRange;
 
 
 // Helper structures
+struct CB_GS
+{
+    XMFLOAT4X4 worldViewProjection; // world-view-projection matrix
+    XMFLOAT4X4 inverseView;         // inverse view matrix
+    XMFLOAT4 eyePos;                // current eye position
+    XMFLOAT4 lightPos;              // current light position
+};
+
+struct CB_CS
+{
+    unsigned int cubeWidth;			// number of masspoint in the smaller volcube in one row
+    unsigned int cubeCellSize;		// size of one volcube cell
+    unsigned int particleCount;		// total count of model vertices
+
+    unsigned int isPicking;			// bool for mouse picking
+    unsigned int pickOriginX;		// pick origin
+    unsigned int pickOriginY;		// pick origin
+    unsigned int dummy1;			// dummy
+    unsigned int dummy2;            // dummy
+
+    XMFLOAT4 pickDir;		        // picking vector direction
+    XMFLOAT4 eyePos;		        // eye position
+
+    float stiffness;		        // stiffness
+    float damping;			        // damping, negative!
+    float dt;				        // delta time
+    float im;				        // inverse mass of masspoints
+};
+
 struct MASSPOINT
 {
-    XMFLOAT4 oldpos;		// previous position of masspoint
-    XMFLOAT4 newpos;		// current position of masspoint
-    XMFLOAT4 acc;			// masspoint acceleration
+    XMFLOAT4 oldpos;		        // previous position of masspoint
+    XMFLOAT4 newpos;		        // current position of masspoint
+    XMFLOAT4 acc;			        // masspoint acceleration
     unsigned int neighbour_same;	// neighbour_data mask in the same volcube
     unsigned int neighbour_other;	// neighbour_data mask in the other volcube
 };
 
 struct PARTICLE
 {
-    XMFLOAT4 pos;			// model vertex position in world space
-    XMFLOAT4 npos;			// model vertex normal's end point (normal = (npos-pos))
-    XMFLOAT4 mpid1;			// model masscube ID (#1)
-    XMFLOAT4 mpid2;			// model masscube ID (#2)
+    XMFLOAT4 pos;			        // model vertex position in world space
+    XMFLOAT4 npos;			        // model vertex normal's end point (normal = (npos-pos))
+    XMFLOAT4 mpid1;			        // model masscube ID (#1)
+    XMFLOAT4 mpid2;			        // model masscube ID (#2)
 };
 
 struct INDEXER
 {
-    XMFLOAT3 vc1index;
-    XMFLOAT3 vc2index;
-    float w1[8];
-    float w2[8];
-    float nw1[8];
-    float nw2[8];
+    XMFLOAT3 vc1index;              // neighbouring masspoint index in the first volcube
+    XMFLOAT3 vc2index;              // neighbouring masspoint index in the second volcube
+    float w1[8];                    // masspoint weights of the first volcube neighbours
+    float w2[8];                    // masspoint weights of the second volcube neighbours
+    float nw1[8];                   // normal weights of the first volcube neighbours
+    float nw2[8];                   // normal weights of the second volcube neighbours
 };
 
 /// Structure representing BVBox data
 /// isLeaf -> the box contains 2 masspoints with given bounding box (<-- valid ID(s))
 struct BVBOX {
 
-    int leftID;            // ID of left child masspoint
-    int rightID;           // ID of right child masspoint
+    int leftID;                     // ID of left child masspoint
+    int rightID;                    // ID of right child masspoint
 
-    float minX;             // coordinates
-    float maxX;
-    float minY;
-    float maxY;
-    float minZ;
-    float maxZ;
+    float minX;                     // minX coordinate of the bounding box
+    float maxX;                     // maxX coordinate of the bounding box
+    float minY;                     // minY coordinate of the bounding box
+    float maxY;                     // maxY coordinate of the bounding box
+    float minZ;                     // minZ coordinate of the bounding box
+    float maxZ;                     // maxZ coordinate of the bounding box
 
     BVBOX() : leftID(-1), rightID(-1), minX(FLT_MAX), maxX(FLT_MIN), minY(FLT_MAX), maxY(FLT_MIN), minZ(FLT_MAX), maxZ(FLT_MIN) {}
 };
