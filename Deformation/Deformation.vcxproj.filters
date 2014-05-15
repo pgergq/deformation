@@ -20,6 +20,9 @@
     <None Include="PosUpdate.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Collision.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <CLInclude Include="WaitDlg.h" />

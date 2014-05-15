@@ -576,40 +576,37 @@ void Deformable::translate(int x, int y, int z){
     }
 }
 
-
 //--------------------------------------------------------------------------------------
 // Initialize collision detection helper structures
 // CALL MANUALLY AFTER TRANSLATING THE MODEL!
 //--------------------------------------------------------------------------------------
 void Deformable::initCollisionDetection(){
 
-    MassIDVector tmp1, tmp2;
+    MassIDTypeVector tmp;
 
     // create MassIDs from surface masspoints in 1st vc
     for (uint z = 0; z < VCUBEWIDTH; z++){
         for (uint y = 0; y < VCUBEWIDTH; y++){
             for (uint x = 0; x < VCUBEWIDTH; x++){
                 if (nvc1[z][y][x] == 1){               // type 1 masspoint -> model surface masspoints
-                    tmp1.push_back(MassID(z*VCUBEWIDTH*VCUBEWIDTH + y*VCUBEWIDTH + x, masscube1[z*VCUBEWIDTH*VCUBEWIDTH + y*VCUBEWIDTH + x]));
+                    tmp.push_back(MassIDType(z*VCUBEWIDTH*VCUBEWIDTH + y*VCUBEWIDTH + x, 1, masscube1[z*VCUBEWIDTH*VCUBEWIDTH + y*VCUBEWIDTH + x]));
                 }
             }
         }
     }
-    ctree1 = BVHierarchy(tmp1).bvh;
 
     // create MassIDs from surface masspoints in 2nd vc
     for (uint z = 0; z < VCUBEWIDTH + 1; z++){
         for (uint y = 0; y < VCUBEWIDTH + 1; y++){
             for (uint x = 0; x < VCUBEWIDTH + 1; x++){
                 if (nvc2[z][y][x] == 1){               // type 1 masspoint -> model surface masspoints
-                    tmp2.push_back(MassID(z*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1) + y*(VCUBEWIDTH + 1) + x, masscube2[z*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1) + y*(VCUBEWIDTH + 1) + x]));
+                    tmp.push_back(MassIDType(z*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1) + y*(VCUBEWIDTH + 1) + x, 2, masscube2[z*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1) + y*(VCUBEWIDTH + 1) + x]));
                 }
             }
         }
     }
-    ctree2 = BVHierarchy(tmp2).bvh;         // store BVHierarchy
+    ctree = BVHierarchy(tmp).bvh;         // store BVHierarchy
 }
-
 
 //--------------------------------------------------------------------------------------
 // Destructor

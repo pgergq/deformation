@@ -61,8 +61,7 @@ public:
 
     std::array<std::array<std::array<uint, VCUBEWIDTH>, VCUBEWIDTH>, VCUBEWIDTH> nvc1;   // neighbouring data in the first volcube
     std::array<std::array<std::array<uint, VCUBEWIDTH + 1>, VCUBEWIDTH + 1>, VCUBEWIDTH + 1> nvc2;   // ...second volcube
-    BVBoxVector ctree1;         // collision detection helper structure for 1st masscube
-    BVBoxVector ctree2;         // ... 2nd masscube
+    BVBoxVector ctree;         // collision detection helper structure for masscube
 
     // functions
     Deformable() = delete;		// no default constructor

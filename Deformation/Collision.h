@@ -27,14 +27,14 @@ private:
 
 public:
     //variables
-    BVBoxVector bvh;                                // BVHierarchy in its final array-representation
+    BVBoxVector bvh;                                            // BVHierarchy in its final array-representation
 
     //functions
-    BVHierarchy() = delete;                         // no default constructor
-    BVHierarchy(MassVector masspoints);             // construct BVBox from given masspoints
-    BVHierarchy(MassIDVector masspoints);           // construct BVBox from given masspoints+IDs
-    ~BVHierarchy();                                 // destructor
-    BVBoxVector sort(MassIDVector masspoints, uint mode);       // sort masspoints in order, add IDs
+    BVHierarchy() = delete;                                     // no default constructor
+    //BVHierarchy(MassVector masspoints);                         // construct BVBox from given masspoints
+    BVHierarchy(MassIDTypeVector masspoints);                   // construct BVBox from given masspoints+IDs
+    ~BVHierarchy();                                             // destructor
+    BVBoxVector sort(MassIDTypeVector masspoints, uint mode);   // sort masspoints in order, add IDs
     BVBoxVector merge(BVBoxVector a, BVBoxVector b);            // merge two binary trees into one array
 };
 

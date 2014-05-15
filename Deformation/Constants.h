@@ -21,12 +21,11 @@
 using namespace DirectX;
 
 // constant defines for Deformation.cpp and Deformable.cpp
-
 #define GET_X_LPARAM(lp)        ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp)        ((int)(short)HIWORD(lp))
 
 
-/// DEFORMATION defines
+// DEFORMATION defines
 #define VCUBEWIDTH              13          // n*n*n inner cube, (n+1)*(n+1)*(n+1) outer cube
 
 // volcube neighbouring data
@@ -54,6 +53,8 @@ extern float stiffnessConstant;
 extern float dampingConstant;
 extern float invMassConstant;
 extern float collisionRangeConstant;
+extern float gravityConstant;
+extern float tablePositionConstant;
 
 
 
@@ -70,21 +71,22 @@ struct CB_CS
 {
     unsigned int cubeWidth;         // number of masspoint in the smaller volcube in one row
     unsigned int cubeCellSize;      // size of one volcube cell
-    unsigned int particleCount;     // total count of model vertices
+    unsigned int objectCount;       // total count of deformable bodies
 
     unsigned int isPicking;         // bool for mouse picking
     unsigned int pickOriginX;       // pick origin
     unsigned int pickOriginY;       // pick origin
-    unsigned int dummy1;            // dummy
-    unsigned int dummy2;            // dummy
-
-    XMFLOAT4 pickDir;               // picking vector direction
-    XMFLOAT4 eyePos;                // eye position
 
     float stiffness;                // stiffness
     float damping;                  // damping, negative!
     float dt;                       // delta time
     float im;                       // inverse mass of masspoints
+    float gravity;                  // F(gravity) = (0, gravity, 0)
+    float tablePos;                 // table position = (0, tablePos, 0)
+
+    XMFLOAT4 pickDir;               // picking vector direction
+    XMFLOAT4 eyePos;                // eye position
+
 };
 
 struct MASSPOINT
@@ -119,7 +121,9 @@ struct INDEXER
 struct BVBOX {
 
     int leftID;                     // ID of left child masspoint
+    int leftType;                   // masspoint type of left child (1st or 2nd masscube)
     int rightID;                    // ID of right child masspoint
+    int rightType;                  // masspoint type of right child
 
     float minX;                     // minX coordinate of the bounding box
     float maxX;                     // maxX coordinate of the bounding box
@@ -128,7 +132,19 @@ struct BVBOX {
     float minZ;                     // minZ coordinate of the bounding box
     float maxZ;                     // maxZ coordinate of the bounding box
 
-    BVBOX() : leftID(-1), rightID(-1), minX(FLT_MAX), maxX(FLT_MIN), minY(FLT_MAX), maxY(FLT_MIN), minZ(FLT_MAX), maxZ(FLT_MIN) {}
+    BVBOX() : leftID(-1), leftType(0), rightID(-1), rightType(0), minX(FLT_MAX), maxX(FLT_MIN), minY(FLT_MAX), maxY(FLT_MIN), minZ(FLT_MAX), maxZ(FLT_MIN) {}
+};
+
+/// Structure representing a BVBOX hierarchy on the GPU
+struct BVHDESC {
+    unsigned int arrayOffset;      // BVBOX-tree starting index in the unified BVBOX-buffer
+    unsigned int masspointCount;   // number of masspoints in this tree
+    float minX;
+    float maxX;
+    float minY;
+    float maxY;
+    float minZ;
+    float maxZ;
 };
 
 // typedefs 
@@ -137,10 +153,10 @@ typedef std::vector<float> vec1float;
 typedef std::vector<int> vec1int;
 typedef std::vector<std::vector<float>> vec2float;
 typedef std::vector<std::vector<int>> vec2int;
-typedef std::vector<MASSPOINT> MassVector;
-typedef std::vector<BVBOX> BVBoxVector;
-typedef std::tuple<int, MASSPOINT> MassID;
-typedef std::vector<MassID> MassIDVector;
+typedef std::vector<MASSPOINT> MassVector;              // vectorized
+typedef std::vector<BVBOX> BVBoxVector;                 // vectorized
+typedef std::tuple<int, int, MASSPOINT> MassIDType;     // Masspoint ID (index in masscube), Type (1st or 2nd masscube), Masspoint (data)
+typedef std::vector<MassIDType> MassIDTypeVector;       // vectorized
 
 
 #endif

@@ -16,3 +16,5 @@ float stiffnessConstant = 400.0f;
 float dampingConstant = -3.0f;
 float invMassConstant = 1.0f;
 float collisionRangeConstant = 0.3f;
+float gravityConstant = -1000.0f;
+float tablePositionConstant = -1000.0f;

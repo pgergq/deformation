@@ -45,39 +45,45 @@ ID3D11SamplerState*                 samplerState = nullptr;
 ID3D11ShaderResourceView*           particleTextureSRV = nullptr;
 
 // storage & access
+ID3D11Buffer*                       bvhCatalogueBuffer = nullptr;
+ID3D11Buffer*                       bvhDataBuffer = nullptr;
 ID3D11Buffer*                       csConstantBuffer = nullptr;
 ID3D11Buffer*                       gsConstantBuffer = nullptr;
-ID3D11Buffer*						indexerBuffer = nullptr;
-ID3D11Buffer*						masscube1Buffer1 = nullptr;
-ID3D11Buffer*						masscube1Buffer2 = nullptr;
-ID3D11Buffer*						masscube2Buffer1 = nullptr;
-ID3D11Buffer*						masscube2Buffer2 = nullptr;
+ID3D11Buffer*                       indexerBuffer = nullptr;
+ID3D11Buffer*                       masscube1Buffer1 = nullptr;
+ID3D11Buffer*                       masscube1Buffer2 = nullptr;
+ID3D11Buffer*                       masscube2Buffer1 = nullptr;
+ID3D11Buffer*                       masscube2Buffer2 = nullptr;
 ID3D11Buffer*                       particleBuffer1 = nullptr;
 ID3D11Buffer*                       particleBuffer2 = nullptr;
 ID3D11RenderTargetView*             pickingRTV1 = nullptr;
 ID3D11RenderTargetView*             pickingRTV2 = nullptr;
-ID3D11ShaderResourceView*			indexerSRV = nullptr;
-ID3D11ShaderResourceView*			masscube1SRV1 = nullptr;
-ID3D11ShaderResourceView*			masscube1SRV2 = nullptr;
-ID3D11ShaderResourceView*			masscube2SRV1 = nullptr;
-ID3D11ShaderResourceView*			masscube2SRV2 = nullptr;
+ID3D11ShaderResourceView*           bvhCatalogueSRV = nullptr;
+ID3D11ShaderResourceView*           bvhDataSRV = nullptr;
+ID3D11ShaderResourceView*           indexerSRV = nullptr;
+ID3D11ShaderResourceView*           masscube1SRV1 = nullptr;
+ID3D11ShaderResourceView*           masscube1SRV2 = nullptr;
+ID3D11ShaderResourceView*           masscube2SRV1 = nullptr;
+ID3D11ShaderResourceView*           masscube2SRV2 = nullptr;
 ID3D11ShaderResourceView*           particleSRV1 = nullptr;
 ID3D11ShaderResourceView*           particleSRV2 = nullptr;
 ID3D11ShaderResourceView*           pickingSRV1 = nullptr;
 ID3D11ShaderResourceView*           pickingSRV2 = nullptr;
 ID3D11Texture2D*                    pickingTexture1 = nullptr;
 ID3D11Texture2D*                    pickingTexture2 = nullptr;
-ID3D11UnorderedAccessView*			masscube1UAV1 = nullptr;
-ID3D11UnorderedAccessView*			masscube1UAV2 = nullptr;
-ID3D11UnorderedAccessView*			masscube2UAV1 = nullptr;
-ID3D11UnorderedAccessView*			masscube2UAV2 = nullptr;
+ID3D11UnorderedAccessView*          bvhCatalogueUAV = nullptr;
+ID3D11UnorderedAccessView*          bvhDataUAV = nullptr;
+ID3D11UnorderedAccessView*          masscube1UAV1 = nullptr;
+ID3D11UnorderedAccessView*          masscube1UAV2 = nullptr;
+ID3D11UnorderedAccessView*          masscube2UAV1 = nullptr;
+ID3D11UnorderedAccessView*          masscube2UAV2 = nullptr;
 ID3D11UnorderedAccessView*          particleUAV1 = nullptr;
 ID3D11UnorderedAccessView*          particleUAV2 = nullptr;
 
 // shaders
 ID3D11ComputeShader*                physicsCS1 = nullptr;
 ID3D11ComputeShader*                physicsCS2 = nullptr;
-ID3D11ComputeShader*				updateCS = nullptr;
+ID3D11ComputeShader*                updateCS = nullptr;
 ID3D11GeometryShader*               renderGS = nullptr;
 ID3D11PixelShader*                  renderPS = nullptr;
 ID3D11PixelShader*                  pickingPS1 = nullptr;
@@ -121,7 +127,6 @@ void CALLBACK OnD3D11DestroyDevice(void* pUserContext);
 void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediateContext, double fTime, float fElapsedTime, void* pUserContext);
 HRESULT initBuffers(ID3D11Device* pd3dDevice);
 void print_debug_file(const char*);
-
 
 
 
@@ -210,11 +215,13 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
     // Update CS constant buffer
     pcbCS->cubeWidth = VCUBEWIDTH;
     pcbCS->cubeCellSize = cubeCellSize;
-    pcbCS->particleCount = particleCount;
+    pcbCS->objectCount = objectCount;
     pcbCS->stiffness = stiffnessConstant;
     pcbCS->damping = dampingConstant;
     pcbCS->dt = fElapsedTime;
     pcbCS->im = invMassConstant;
+    pcbCS->gravity = gravityConstant;
+    pcbCS->tablePos = tablePositionConstant;
 
     // Send picking data to GPU
     if (isPicking)
@@ -385,26 +392,32 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
             break;
         case 0x58:    // 'X' key
         {
-            SAFE_RELEASE(particleBuffer1);
-            SAFE_RELEASE(particleBuffer2);
-            SAFE_RELEASE(particleSRV1);
-            SAFE_RELEASE(particleSRV2);
-            SAFE_RELEASE(particleUAV1);
-            SAFE_RELEASE(particleUAV2);
+            SAFE_RELEASE(bvhCatalogueBuffer);
+            SAFE_RELEASE(bvhDataBuffer);
             SAFE_RELEASE(indexerBuffer);
-            SAFE_RELEASE(indexerSRV);
             SAFE_RELEASE(masscube1Buffer1);
             SAFE_RELEASE(masscube1Buffer2);
-            SAFE_RELEASE(masscube1SRV1);
-            SAFE_RELEASE(masscube1SRV2);
-            SAFE_RELEASE(masscube1UAV1);
-            SAFE_RELEASE(masscube1UAV2);
             SAFE_RELEASE(masscube2Buffer1);
             SAFE_RELEASE(masscube2Buffer2);
+            SAFE_RELEASE(particleBuffer1);
+            SAFE_RELEASE(particleBuffer2);
+            SAFE_RELEASE(bvhCatalogueSRV);
+            SAFE_RELEASE(bvhDataSRV);
+            SAFE_RELEASE(indexerSRV);
+            SAFE_RELEASE(masscube1SRV1);
+            SAFE_RELEASE(masscube1SRV2);
             SAFE_RELEASE(masscube2SRV1);
             SAFE_RELEASE(masscube2SRV2);
+            SAFE_RELEASE(particleSRV1);
+            SAFE_RELEASE(particleSRV2);
+            SAFE_RELEASE(bvhCatalogueUAV);
+            SAFE_RELEASE(bvhDataUAV);
+            SAFE_RELEASE(masscube1UAV1);
+            SAFE_RELEASE(masscube1UAV2);
             SAFE_RELEASE(masscube2UAV1);
             SAFE_RELEASE(masscube2UAV2);
+            SAFE_RELEASE(particleUAV1);
+            SAFE_RELEASE(particleUAV2);
             initBuffers(DXUTGetD3D11Device());
             break;
         }
@@ -425,6 +438,10 @@ bool CALLBACK IsD3D11DeviceAcceptable(const CD3D11EnumAdapterInfo *AdapterInfo, 
 
 //--------------------------------------------------------------------------------------
 // Init shaders, set vertex buffer
+// Loading a model: 1.) Deformable instance("file");
+//                  2.) instance.build();
+//                 [3.) instance.translate(...);]
+//                  4.) instance.initCollisionDetection();
 //--------------------------------------------------------------------------------------
 HRESULT importFiles(){
 
@@ -456,7 +473,7 @@ HRESULT importFiles(){
     }
     cubeCellSize = deformableObjects[0].cubeCellSize;
 
-    // Initialize collision detection structures -- AFTER TRANSALTING THE MODELS
+    // Initialize collision detection structures -- AFTER TRANSLATING THE MODELS
     for (uint i = 0; i < objectCount; i++){
         deformableObjects[i].initCollisionDetection();
     }
@@ -585,9 +602,48 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
         }
     }
 
-    /// ***TODO*** load ctrees in one place
+
+    /// Load Collision Detection structures in one place
+
+    // Array for BVH-decriptor structures
+    uint offset = 0;
+    // first masscube collision trees
+    BVHDESC* bdData = new BVHDESC[objectCount];
+    if (!bdData) return E_OUTOFMEMORY;
+
+    // create tree descriptors
+    for (uint i = 0; i < objectCount; i++){
+
+        // create entry for the first ctree
+        BVHDESC tmp;
+        tmp.arrayOffset = offset;
+        tmp.masspointCount = deformableObjects[i].ctree.size();
+        tmp.minX = deformableObjects[i].ctree[0].minX;
+        tmp.maxX = deformableObjects[i].ctree[0].maxX;
+        tmp.minY = deformableObjects[i].ctree[0].minY;
+        tmp.maxY = deformableObjects[i].ctree[0].maxY;
+        tmp.minZ = deformableObjects[i].ctree[0].minZ;
+        tmp.maxZ = deformableObjects[i].ctree[0].maxZ;
+        bdData[i] = tmp;
+        offset += tmp.masspointCount;
+
+    }
+
+    // Array for BVHierarchies' data
+    BVBOX* btData = new BVBOX[offset];          // offset = total collision masspoint count
+    if (!btData) return E_OUTOFMEMORY;
+
+    uint ix = 0;
+    // store bvbox data in one place
+    for (uint i = 0; i < objectCount; i++){
+        for (uint j = 0; j < deformableObjects[i].ctree.size(); j++){
+            btData[ix] = deformableObjects[i].ctree[j];
+            ix++;
+        }
+    }
 
 
+    /// Create buffers
 
     // Desc for Particle buffers
     D3D11_BUFFER_DESC desc;
@@ -607,6 +663,24 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     vdesc.StructureByteStride = sizeof(MASSPOINT);
     vdesc.Usage = D3D11_USAGE_DEFAULT;
 
+    // Desc for collision detection catalogue
+    D3D11_BUFFER_DESC bcdesc;
+    ZeroMemory(&bcdesc, sizeof(bcdesc));
+    bcdesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+    bcdesc.ByteWidth = objectCount * sizeof(BVHDESC);
+    bcdesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+    bcdesc.StructureByteStride = sizeof(BVHDESC);
+    bcdesc.Usage = D3D11_USAGE_DEFAULT;
+
+    // Desc for collision detection data
+    D3D11_BUFFER_DESC bddesc;
+    ZeroMemory(&bddesc, sizeof(bddesc));
+    bddesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+    bddesc.ByteWidth = offset * sizeof(BVBOX);
+    bddesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+    bddesc.StructureByteStride = sizeof(BVBOX);
+    bddesc.Usage = D3D11_USAGE_DEFAULT;
+
     // Set initial Particles data
     D3D11_SUBRESOURCE_DATA InitData;
     InitData.pSysMem = pData1;
@@ -616,7 +690,7 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     DXUT_SetDebugName(particleBuffer2, "ParticleBuffer2");
     SAFE_DELETE_ARRAY(pData1);
 
-    ///Set initial Volumetric data
+    // Set initial Volumetric data
     D3D11_SUBRESOURCE_DATA v1data;
     v1data.pSysMem = vData1;
     D3D11_SUBRESOURCE_DATA v2data;
@@ -633,8 +707,7 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     DXUT_SetDebugName(masscube2Buffer2, "VolCube2c");
     SAFE_DELETE_ARRAY(vData2);
 
-
-    /// Buffer for IndexCube
+    // Buffer for IndexCube
     D3D11_BUFFER_DESC desc2;
     ZeroMemory(&desc2, sizeof(desc2));
     desc2.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
@@ -648,7 +721,20 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     DXUT_SetDebugName(indexerBuffer, "IndexCube");
     SAFE_DELETE_ARRAY(iData1);
 
-    /// RV for Particle data
+    // Buffer for collision detection catalogue and data
+    D3D11_SUBRESOURCE_DATA bc_init;
+    bc_init.pSysMem = bdData;
+    V_RETURN(pd3dDevice->CreateBuffer(&bcdesc, &bc_init, &bvhCatalogueBuffer));
+    DXUT_SetDebugName(bvhCatalogueBuffer, "BVHCatalogue buffer");
+    SAFE_DELETE_ARRAY(bdData);
+
+    D3D11_SUBRESOURCE_DATA bd_init;
+    bd_init.pSysMem = btData;
+    V_RETURN(pd3dDevice->CreateBuffer(&bddesc, &bd_init, &bvhDataBuffer));
+    DXUT_SetDebugName(bvhDataBuffer, "BVHData buffer");
+    SAFE_DELETE_ARRAY(btData);
+
+    // SRV for Particle data
     D3D11_SHADER_RESOURCE_VIEW_DESC DescRV;
     ZeroMemory(&DescRV, sizeof(DescRV));
     DescRV.Format = DXGI_FORMAT_UNKNOWN;
@@ -660,7 +746,7 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     DXUT_SetDebugName(particleSRV1, "ParticleArray0 SRV");
     DXUT_SetDebugName(particleSRV2, "ParticleArray1 SRV");
 
-    /// SRV for indexcube
+    // SRV for indexcube
     D3D11_SHADER_RESOURCE_VIEW_DESC DescRV2;
     ZeroMemory(&DescRV2, sizeof(DescRV2));
     DescRV2.Format = DXGI_FORMAT_UNKNOWN;
@@ -670,7 +756,7 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     V_RETURN(pd3dDevice->CreateShaderResourceView(indexerBuffer, &DescRV2, &indexerSRV));
     DXUT_SetDebugName(indexerSRV, "IndexCube SRV");
 
-    /// SRV for VolCubes
+    // SRV for VolCubes
     D3D11_SHADER_RESOURCE_VIEW_DESC DescRVV;
     ZeroMemory(&DescRVV, sizeof(DescRVV));
     DescRVV.Format = DXGI_FORMAT_UNKNOWN;
@@ -687,7 +773,26 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     DXUT_SetDebugName(masscube2SRV1, "VolCube2 RV");
     DXUT_SetDebugName(masscube2SRV2, "VolCube2c RV");
 
-    /// UAV for Particle data
+    // SRV for collision detection catalogue and data
+    D3D11_SHADER_RESOURCE_VIEW_DESC bcdescRV;
+    ZeroMemory(&bcdescRV, sizeof(bcdescRV));
+    bcdescRV.Format = DXGI_FORMAT_UNKNOWN;
+    bcdescRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+    bcdescRV.Buffer.FirstElement = 0;
+    bcdescRV.Buffer.NumElements = objectCount;
+    V_RETURN(pd3dDevice->CreateShaderResourceView(bvhCatalogueBuffer, &bcdescRV, &bvhCatalogueSRV));
+    DXUT_SetDebugName(bvhCatalogueSRV, "BVHCatalogue SRV");
+
+    D3D11_SHADER_RESOURCE_VIEW_DESC bddescRV;
+    ZeroMemory(&bddescRV, sizeof(bddescRV));
+    bddescRV.Format = DXGI_FORMAT_UNKNOWN;
+    bddescRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+    bddescRV.Buffer.FirstElement = 0;
+    bddescRV.Buffer.NumElements = offset;
+    V_RETURN(pd3dDevice->CreateShaderResourceView(bvhDataBuffer, &bddescRV, &bvhDataSRV));
+    DXUT_SetDebugName(bvhDataSRV, "BVHData SRV");
+
+    // UAV for Particle data
     D3D11_UNORDERED_ACCESS_VIEW_DESC DescUAV;
     ZeroMemory(&DescUAV, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
     DescUAV.Format = DXGI_FORMAT_UNKNOWN;
@@ -699,7 +804,7 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     DXUT_SetDebugName(particleUAV1, "ParticleArray0 UAV");
     DXUT_SetDebugName(particleUAV2, "ParticleArray1 UAV");
 
-    /// UAVs for Volumetric data
+    // UAVs for Volumetric data
     D3D11_UNORDERED_ACCESS_VIEW_DESC vDescUAV;
     ZeroMemory(&vDescUAV, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
     vDescUAV.Format = DXGI_FORMAT_UNKNOWN;
@@ -715,6 +820,26 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     V_RETURN(pd3dDevice->CreateUnorderedAccessView(masscube2Buffer2, &vDescUAV, &masscube2UAV2));
     DXUT_SetDebugName(masscube2UAV1, "VolCube2 UAV");
     DXUT_SetDebugName(masscube2UAV2, "VolCube2c UAV");
+
+    // UAV for collision detection catalogue and data
+    D3D11_UNORDERED_ACCESS_VIEW_DESC bcdescUAV;
+    ZeroMemory(&bcdescUAV, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
+    bcdescUAV.Format = DXGI_FORMAT_UNKNOWN;
+    bcdescUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+    bcdescUAV.Buffer.FirstElement = 0;
+    bcdescUAV.Buffer.NumElements = objectCount;
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(bvhCatalogueBuffer, &bcdescUAV, &bvhCatalogueUAV));
+    DXUT_SetDebugName(bvhCatalogueUAV, "BVHCatalogue UAV");
+
+    D3D11_UNORDERED_ACCESS_VIEW_DESC bddescUAV;
+    ZeroMemory(&bddescUAV, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
+    bddescUAV.Format = DXGI_FORMAT_UNKNOWN;
+    bddescUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+    bddescUAV.Buffer.FirstElement = 0;
+    bddescUAV.Buffer.NumElements = offset;
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(bvhDataBuffer, &bddescUAV, &bvhDataUAV));
+    DXUT_SetDebugName(bvhDataUAV, "BVHData UAV");
+
 
     return hr;
 }
@@ -1061,44 +1186,51 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 void CALLBACK OnD3D11DestroyDevice(void* pUserContext)
 {
     DXUTGetGlobalResourceCache().OnDestroyDevice();
+    SAFE_RELEASE(blendState);
+    SAFE_RELEASE(depthStencilState);
+    SAFE_RELEASE(samplerState);
+    SAFE_RELEASE(particleTextureSRV);
+    SAFE_RELEASE(bvhCatalogueBuffer);
+    SAFE_RELEASE(bvhDataBuffer);
+    SAFE_RELEASE(csConstantBuffer);
+    SAFE_RELEASE(gsConstantBuffer);
     SAFE_RELEASE(indexerBuffer);
-    SAFE_RELEASE(particleBuffer1);
-    SAFE_RELEASE(particleBuffer2);
-    SAFE_RELEASE(indexerSRV);
     SAFE_RELEASE(masscube1Buffer1);
     SAFE_RELEASE(masscube1Buffer2);
     SAFE_RELEASE(masscube2Buffer1);
     SAFE_RELEASE(masscube2Buffer2);
+    SAFE_RELEASE(particleBuffer1);
+    SAFE_RELEASE(particleBuffer2);
+    SAFE_RELEASE(pickingRTV1);
+    SAFE_RELEASE(pickingRTV2);
+    SAFE_RELEASE(bvhCatalogueSRV);
+    SAFE_RELEASE(bvhDataSRV);
+    SAFE_RELEASE(indexerSRV);
     SAFE_RELEASE(masscube1SRV1);
     SAFE_RELEASE(masscube1SRV2);
     SAFE_RELEASE(masscube2SRV1);
     SAFE_RELEASE(masscube2SRV2);
+    SAFE_RELEASE(particleSRV1);
+    SAFE_RELEASE(particleSRV2);
+    SAFE_RELEASE(pickingSRV1);
+    SAFE_RELEASE(pickingSRV2);
+    SAFE_RELEASE(pickingTexture1);
+    SAFE_RELEASE(pickingTexture2);
+    SAFE_RELEASE(bvhCatalogueUAV);
+    SAFE_RELEASE(bvhDataUAV);
     SAFE_RELEASE(masscube1UAV1);
     SAFE_RELEASE(masscube1UAV2);
     SAFE_RELEASE(masscube2UAV1);
     SAFE_RELEASE(masscube2UAV2);
-    SAFE_RELEASE(particleSRV1);
-    SAFE_RELEASE(particleSRV2);
     SAFE_RELEASE(particleUAV1);
     SAFE_RELEASE(particleUAV2);
-    SAFE_RELEASE(csConstantBuffer);
-    SAFE_RELEASE(gsConstantBuffer);
-    SAFE_RELEASE(particleTextureSRV);
-    SAFE_RELEASE(renderVS);
+    SAFE_RELEASE(physicsCS1);
+    SAFE_RELEASE(physicsCS2);
+    SAFE_RELEASE(updateCS);
     SAFE_RELEASE(renderGS);
     SAFE_RELEASE(renderPS);
     SAFE_RELEASE(pickingPS1);
     SAFE_RELEASE(pickingPS2);
-    SAFE_RELEASE(physicsCS1);
-    SAFE_RELEASE(physicsCS2);
-    SAFE_RELEASE(updateCS);
-    SAFE_RELEASE(blendState);
-    SAFE_RELEASE(depthStencilState);
-    SAFE_RELEASE(samplerState);
-    SAFE_RELEASE(pickingTexture1);
-    SAFE_RELEASE(pickingTexture2);
-    SAFE_RELEASE(pickingRTV1);
-    SAFE_RELEASE(pickingRTV2);
-    SAFE_RELEASE(pickingSRV1);
-    SAFE_RELEASE(pickingSRV2);
+    SAFE_RELEASE(renderVS);
+    
 }

@@ -19,34 +19,34 @@
 //--------------------------------------------------------------------------------------
 // Constructor1: malloc tree memory, build tree, sort tree
 //--------------------------------------------------------------------------------------
-BVHierarchy::BVHierarchy(MassVector masspoints){
-    
-    // Mass[] -> Mass+ID[]
-    MassIDVector x;
-    uint size = masspoints.size();
-    // extend array to contain power-of-2 number elements
-    uint ext = std::exp2(std::ceil(std::log2(size))) - size;
-    x.reserve(size+ext);
-    for (uint i = 0; i < size; i++){
-        x.push_back(std::tuple<int, MASSPOINT>(i, masspoints[i]));
-    }
-    for (uint i = 0; i < ext; i++){
-        x.push_back(std::tuple<int, MASSPOINT>(-1, MASSPOINT{}));
-    }
-
-    // sort and structurise input
-    bvh = sort(x, 0);
-
-}
+//BVHierarchy::BVHierarchy(MassVector masspoints){
+//    
+//    // Mass[] -> Mass+ID[]
+//    MassIDTypeVector x;
+//    uint size = masspoints.size();
+//    // extend array to contain power-of-2 number elements
+//    uint ext = std::exp2(std::ceil(std::log2(size))) - size;
+//    x.reserve(size+ext);
+//    for (uint i = 0; i < size; i++){
+//        x.push_back(MassID(i, masspoints[i]));
+//    }
+//    for (uint i = 0; i < ext; i++){
+//        x.push_back(MassID(-1, MASSPOINT{}));
+//    }
+//
+//    // sort and structurise input
+//    bvh = sort(x, 0);
+//
+//}
 
 
 //--------------------------------------------------------------------------------------
 // Constructor2: malloc tree memory, build tree, sort tree (<- USE THIS)
 //--------------------------------------------------------------------------------------
-BVHierarchy::BVHierarchy(MassIDVector masspoints){
+BVHierarchy::BVHierarchy(MassIDTypeVector masspoints){
 
     // Mass[] -> Mass+ID[]
-    MassIDVector x;
+    MassIDTypeVector x;
     uint size = masspoints.size();
     // extend array to contain power-of-2 number elements
     uint ext = std::exp2(std::ceil(std::log2(size))) - size;
@@ -55,7 +55,7 @@ BVHierarchy::BVHierarchy(MassIDVector masspoints){
         x.push_back(masspoints[i]);
     }
     for (uint i = 0; i < ext; i++){
-        x.push_back(std::tuple<int, MASSPOINT>(-1, MASSPOINT{}));
+        x.push_back(MassIDType(-1, 0, MASSPOINT{}));
     }
 
     // sort and structurise input
@@ -73,16 +73,16 @@ BVHierarchy::~BVHierarchy(){}
 //--------------------------------------------------------------------------------------
 // Sort helpers
 //--------------------------------------------------------------------------------------
-bool sortX(MassID a, MassID b){
-    return (std::get<1>(a)).newpos.x < (std::get<1>(b)).newpos.x;
+bool sortX(MassIDType a, MassIDType b){
+    return (std::get<2>(a)).newpos.x < (std::get<2>(b)).newpos.x;
 }
 
-bool sortY(MassID a, MassID b){
-    return (std::get<1>(a)).newpos.y < (std::get<1>(b)).newpos.y;
+bool sortY(MassIDType a, MassIDType b){
+    return (std::get<2>(a)).newpos.y < (std::get<2>(b)).newpos.y;
 }
 
-bool sortZ(MassID a, MassID b){
-    return (std::get<1>(a)).newpos.z < (std::get<1>(b)).newpos.z;
+bool sortZ(MassIDType a, MassIDType b){
+    return (std::get<2>(a)).newpos.z < (std::get<2>(b)).newpos.z;
 }
 
 
@@ -90,7 +90,7 @@ bool sortZ(MassID a, MassID b){
 // Sort: sort masspoint+ID pairs: repeatedly by X-Y-Z coordinates
 //       mode: 0=X, 1=Y, 2=Z (sort
 //--------------------------------------------------------------------------------------
-BVBoxVector BVHierarchy::sort(MassIDVector masspoints, uint mode){
+BVBoxVector BVHierarchy::sort(MassIDTypeVector masspoints, uint mode){
 
     // sort 'em!
 
@@ -106,25 +106,29 @@ BVBoxVector BVHierarchy::sort(MassIDVector masspoints, uint mode){
         // one valid and one invalid masspoint -> yippie, edge of the 'valid tree'
         /*else*/ if (std::get<0>(masspoints[0]) != -1 && std::get<0>(masspoints[1]) == -1){
             tmp.leftID = std::get<0>(masspoints[0]);
+            tmp.leftType = std::get<1>(masspoints[0]);
             tmp.rightID = -1;
-            tmp.minX = (std::get<1>(masspoints[0])).newpos.x - collisionRangeConstant;
-            tmp.maxX = (std::get<1>(masspoints[0])).newpos.x + collisionRangeConstant;
-            tmp.minY = (std::get<1>(masspoints[0])).newpos.y - collisionRangeConstant;
-            tmp.maxY = (std::get<1>(masspoints[0])).newpos.y + collisionRangeConstant;
-            tmp.minZ = (std::get<1>(masspoints[0])).newpos.z - collisionRangeConstant;
-            tmp.maxZ = (std::get<1>(masspoints[0])).newpos.z + collisionRangeConstant;
+            tmp.rightType = 0;
+            tmp.minX = (std::get<2>(masspoints[0])).newpos.x - collisionRangeConstant;
+            tmp.maxX = (std::get<2>(masspoints[0])).newpos.x + collisionRangeConstant;
+            tmp.minY = (std::get<2>(masspoints[0])).newpos.y - collisionRangeConstant;
+            tmp.maxY = (std::get<2>(masspoints[0])).newpos.y + collisionRangeConstant;
+            tmp.minZ = (std::get<2>(masspoints[0])).newpos.z - collisionRangeConstant;
+            tmp.maxZ = (std::get<2>(masspoints[0])).newpos.z + collisionRangeConstant;
         }
 
         // two valid masspoints
         else if (std::get<0>(masspoints[0]) != -1 && std::get<0>(masspoints[1]) != -1){
             tmp.leftID = std::get<0>(masspoints[0]);
+            tmp.leftType = std::get<1>(masspoints[0]);
             tmp.rightID = std::get<0>(masspoints[1]);
-            tmp.minX = std::min((std::get<1>(masspoints[0])).newpos.x, (std::get<1>(masspoints[1])).newpos.x) - collisionRangeConstant;
-            tmp.maxX = std::max((std::get<1>(masspoints[0])).newpos.x, (std::get<1>(masspoints[1])).newpos.x) + collisionRangeConstant;
-            tmp.minY = std::min((std::get<1>(masspoints[0])).newpos.y, (std::get<1>(masspoints[1])).newpos.y) - collisionRangeConstant;
-            tmp.maxY = std::max((std::get<1>(masspoints[0])).newpos.y, (std::get<1>(masspoints[1])).newpos.y) + collisionRangeConstant;
-            tmp.minZ = std::min((std::get<1>(masspoints[0])).newpos.z, (std::get<1>(masspoints[1])).newpos.z) - collisionRangeConstant;
-            tmp.maxZ = std::max((std::get<1>(masspoints[0])).newpos.z, (std::get<1>(masspoints[1])).newpos.z) + collisionRangeConstant;
+            tmp.rightType = std::get<1>(masspoints[1]);
+            tmp.minX = std::min((std::get<2>(masspoints[0])).newpos.x, (std::get<2>(masspoints[1])).newpos.x) - collisionRangeConstant;
+            tmp.maxX = std::max((std::get<2>(masspoints[0])).newpos.x, (std::get<2>(masspoints[1])).newpos.x) + collisionRangeConstant;
+            tmp.minY = std::min((std::get<2>(masspoints[0])).newpos.y, (std::get<2>(masspoints[1])).newpos.y) - collisionRangeConstant;
+            tmp.maxY = std::max((std::get<2>(masspoints[0])).newpos.y, (std::get<2>(masspoints[1])).newpos.y) + collisionRangeConstant;
+            tmp.minZ = std::min((std::get<2>(masspoints[0])).newpos.z, (std::get<2>(masspoints[1])).newpos.z) - collisionRangeConstant;
+            tmp.maxZ = std::max((std::get<2>(masspoints[0])).newpos.z, (std::get<2>(masspoints[1])).newpos.z) + collisionRangeConstant;
             
         }
 
@@ -136,7 +140,7 @@ BVBoxVector BVHierarchy::sort(MassIDVector masspoints, uint mode){
     else {
 
         // only sort valid masspoints (no -1 ID)
-        MassIDVector tmp;
+        MassIDTypeVector tmp;
         uint valid = 0;
         while (valid < masspoints.size() && std::get<0>(masspoints[valid]) != (-1)){
             valid++;
@@ -155,8 +159,8 @@ BVBoxVector BVHierarchy::sort(MassIDVector masspoints, uint mode){
         // divide vector and recurse
         BVBoxVector x, y, xy;
         int div = std::ceil((float)masspoints.size() / 2);
-        x = sort(MassIDVector(masspoints.begin(), masspoints.begin() + div), (mode + 1) % 3);
-        y = sort(MassIDVector(masspoints.begin() + div, masspoints.end()), (mode + 1) % 3);
+        x = sort(MassIDTypeVector(masspoints.begin(), masspoints.begin() + div), (mode + 1) % 3);
+        y = sort(MassIDTypeVector(masspoints.begin() + div, masspoints.end()), (mode + 1) % 3);
 
         BVBOX tmp2;                                     // tmp <- bounding box for each masspoint in masspoints
 
