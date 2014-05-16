@@ -10,33 +10,6 @@
 #define maxv2	(cube_width+1)*(cube_width+1)*(cube_width+1)
 
 
-struct Particle			// vertex in the input object
-{
-	float4 pos;
-	float4 npos;
-	float4 mpid1;
-	float4 mpid2;
-};
-
-struct Indexer
-{
-	float3 vc1index;	// index in first volumetric cube
-	float3 vc2index;	// index in second volumetric cube
-	float w1[8];		// neighbour weights in first volumetric cube
-	float w2[8];		// neighbour weights in second volumetric cube
-	float nw1[8];		// neighbour weights for normal
-	float nw2[8];		//			--||--
-};
-
-struct MassPoint		// vertex in the input volumetric cubes
-{
-	float4 oldpos;
-	float4 newpos;
-	float4 acc;
-	uint neighbour_same;
-	uint neighbour_other;
-};
-
 cbuffer cbCS : register(b0)
 {
     uint cube_width;
@@ -57,6 +30,9 @@ cbuffer cbCS : register(b0)
     float4 pick_dir;
     float4 eye_pos;
 };
+
+// include structure definitions
+#include "Structures.hlsl"
 
 RWStructuredBuffer<Particle>  particles	: register(u0);
 StructuredBuffer<Indexer>     indexer	: register(t0);

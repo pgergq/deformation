@@ -45,8 +45,10 @@ ID3D11SamplerState*                 samplerState = nullptr;
 ID3D11ShaderResourceView*           particleTextureSRV = nullptr;
 
 // storage & access
-ID3D11Buffer*                       bvhCatalogueBuffer = nullptr;
-ID3D11Buffer*                       bvhDataBuffer = nullptr;
+ID3D11Buffer*                       bvhCatalogueBuffer1 = nullptr;
+ID3D11Buffer*                       bvhCatalogueBuffer2 = nullptr;
+ID3D11Buffer*                       bvhDataBuffer1 = nullptr;
+ID3D11Buffer*                       bvhDataBuffer2 = nullptr;
 ID3D11Buffer*                       csConstantBuffer = nullptr;
 ID3D11Buffer*                       gsConstantBuffer = nullptr;
 ID3D11Buffer*                       indexerBuffer = nullptr;
@@ -58,8 +60,10 @@ ID3D11Buffer*                       particleBuffer1 = nullptr;
 ID3D11Buffer*                       particleBuffer2 = nullptr;
 ID3D11RenderTargetView*             pickingRTV1 = nullptr;
 ID3D11RenderTargetView*             pickingRTV2 = nullptr;
-ID3D11ShaderResourceView*           bvhCatalogueSRV = nullptr;
-ID3D11ShaderResourceView*           bvhDataSRV = nullptr;
+ID3D11ShaderResourceView*           bvhCatalogueSRV1 = nullptr;
+ID3D11ShaderResourceView*           bvhCatalogueSRV2 = nullptr;
+ID3D11ShaderResourceView*           bvhDataSRV1 = nullptr;
+ID3D11ShaderResourceView*           bvhDataSRV2 = nullptr;
 ID3D11ShaderResourceView*           indexerSRV = nullptr;
 ID3D11ShaderResourceView*           masscube1SRV1 = nullptr;
 ID3D11ShaderResourceView*           masscube1SRV2 = nullptr;
@@ -71,8 +75,10 @@ ID3D11ShaderResourceView*           pickingSRV1 = nullptr;
 ID3D11ShaderResourceView*           pickingSRV2 = nullptr;
 ID3D11Texture2D*                    pickingTexture1 = nullptr;
 ID3D11Texture2D*                    pickingTexture2 = nullptr;
-ID3D11UnorderedAccessView*          bvhCatalogueUAV = nullptr;
-ID3D11UnorderedAccessView*          bvhDataUAV = nullptr;
+ID3D11UnorderedAccessView*          bvhCatalogueUAV1 = nullptr;
+ID3D11UnorderedAccessView*          bvhCatalogueUAV2 = nullptr;
+ID3D11UnorderedAccessView*          bvhDataUAV1 = nullptr;
+ID3D11UnorderedAccessView*          bvhDataUAV2 = nullptr;
 ID3D11UnorderedAccessView*          masscube1UAV1 = nullptr;
 ID3D11UnorderedAccessView*          masscube1UAV2 = nullptr;
 ID3D11UnorderedAccessView*          masscube2UAV1 = nullptr;
@@ -91,7 +97,7 @@ ID3D11PixelShader*                  pickingPS2 = nullptr;
 ID3D11VertexShader*                 renderVS = nullptr;
 
 // Scene variables
-std::vector<Deformable>				deformableObjects;				// scene objects
+std::vector<Deformable>             deformableObjects;				// scene objects
 uint                                objectCount;					// # of deformable bodies
 uint                                particleCount;					// # of total vertex count
 uint                                mass1Count;						// #s of total masspoints
@@ -99,18 +105,18 @@ uint                                mass2Count;
 uint                                cubeCellSize;					// cell size in masscubes
 
 // Window & picking variables
-int									windowWidth = 800;
-int									windowHeight = 600;
-int									mouseClickX;
-int									mouseClickY;
-int									pickOriginX;
-int									pickOriginY;
-bool								isPicking = false;				// RBUTTON is pressed
-bool								renderPicking = false;			// render model to texture for picking
-XMFLOAT4							lightPos(0, 0, -10000, 1);		// light position
+int                                 windowWidth = 800;
+int                                 windowHeight = 600;
+int                                 mouseClickX;
+int                                 mouseClickY;
+int                                 pickOriginX;
+int                                 pickOriginY;
+bool                                isPicking = false;				// RBUTTON is pressed
+bool                                renderPicking = false;			// render model to texture for picking
+XMFLOAT4                            lightPos(0, 0, -10000, 1);		// light position
 
 // Debug file
-std::ofstream						debug;
+std::ofstream                       debug;
 
 
 //--------------------------------------------------------------------------------------
@@ -272,6 +278,7 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
     std::swap(masscube2Buffer1, masscube2Buffer2);
     std::swap(masscube2SRV1, masscube2SRV2);
     std::swap(masscube2UAV1, masscube2UAV2);
+    //--------------------------------------------------------------------------------------
 
     //--------------------------------------------------------------------------------------
     // EXECUTE SECOND COMPUTE SHADER: UPDATE POSITIONS
@@ -392,8 +399,10 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
             break;
         case 0x58:    // 'X' key
         {
-            SAFE_RELEASE(bvhCatalogueBuffer);
-            SAFE_RELEASE(bvhDataBuffer);
+            SAFE_RELEASE(bvhCatalogueBuffer1);
+            SAFE_RELEASE(bvhCatalogueBuffer2);
+            SAFE_RELEASE(bvhDataBuffer1);
+            SAFE_RELEASE(bvhDataBuffer2);
             SAFE_RELEASE(indexerBuffer);
             SAFE_RELEASE(masscube1Buffer1);
             SAFE_RELEASE(masscube1Buffer2);
@@ -401,8 +410,10 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
             SAFE_RELEASE(masscube2Buffer2);
             SAFE_RELEASE(particleBuffer1);
             SAFE_RELEASE(particleBuffer2);
-            SAFE_RELEASE(bvhCatalogueSRV);
-            SAFE_RELEASE(bvhDataSRV);
+            SAFE_RELEASE(bvhCatalogueSRV1);
+            SAFE_RELEASE(bvhCatalogueSRV2);
+            SAFE_RELEASE(bvhDataSRV1);
+            SAFE_RELEASE(bvhDataSRV2);
             SAFE_RELEASE(indexerSRV);
             SAFE_RELEASE(masscube1SRV1);
             SAFE_RELEASE(masscube1SRV2);
@@ -410,8 +421,10 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
             SAFE_RELEASE(masscube2SRV2);
             SAFE_RELEASE(particleSRV1);
             SAFE_RELEASE(particleSRV2);
-            SAFE_RELEASE(bvhCatalogueUAV);
-            SAFE_RELEASE(bvhDataUAV);
+            SAFE_RELEASE(bvhCatalogueUAV1);
+            SAFE_RELEASE(bvhCatalogueUAV2);
+            SAFE_RELEASE(bvhDataUAV1);
+            SAFE_RELEASE(bvhDataUAV2);
             SAFE_RELEASE(masscube1UAV1);
             SAFE_RELEASE(masscube1UAV2);
             SAFE_RELEASE(masscube2UAV1);
@@ -724,14 +737,18 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     // Buffer for collision detection catalogue and data
     D3D11_SUBRESOURCE_DATA bc_init;
     bc_init.pSysMem = bdData;
-    V_RETURN(pd3dDevice->CreateBuffer(&bcdesc, &bc_init, &bvhCatalogueBuffer));
-    DXUT_SetDebugName(bvhCatalogueBuffer, "BVHCatalogue buffer");
+    V_RETURN(pd3dDevice->CreateBuffer(&bcdesc, &bc_init, &bvhCatalogueBuffer1));
+    V_RETURN(pd3dDevice->CreateBuffer(&bcdesc, &bc_init, &bvhCatalogueBuffer2));
+    DXUT_SetDebugName(bvhCatalogueBuffer1, "BVHCatalogue buffer1");
+    DXUT_SetDebugName(bvhCatalogueBuffer2, "BVHCatalogue buffer2");
     SAFE_DELETE_ARRAY(bdData);
 
     D3D11_SUBRESOURCE_DATA bd_init;
     bd_init.pSysMem = btData;
-    V_RETURN(pd3dDevice->CreateBuffer(&bddesc, &bd_init, &bvhDataBuffer));
-    DXUT_SetDebugName(bvhDataBuffer, "BVHData buffer");
+    V_RETURN(pd3dDevice->CreateBuffer(&bddesc, &bd_init, &bvhDataBuffer1));
+    V_RETURN(pd3dDevice->CreateBuffer(&bddesc, &bd_init, &bvhDataBuffer2));
+    DXUT_SetDebugName(bvhDataBuffer1, "BVHData buffer1");
+    DXUT_SetDebugName(bvhDataBuffer2, "BVHData buffer2");
     SAFE_DELETE_ARRAY(btData);
 
     // SRV for Particle data
@@ -780,8 +797,10 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     bcdescRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     bcdescRV.Buffer.FirstElement = 0;
     bcdescRV.Buffer.NumElements = objectCount;
-    V_RETURN(pd3dDevice->CreateShaderResourceView(bvhCatalogueBuffer, &bcdescRV, &bvhCatalogueSRV));
-    DXUT_SetDebugName(bvhCatalogueSRV, "BVHCatalogue SRV");
+    V_RETURN(pd3dDevice->CreateShaderResourceView(bvhCatalogueBuffer1, &bcdescRV, &bvhCatalogueSRV1));
+    V_RETURN(pd3dDevice->CreateShaderResourceView(bvhCatalogueBuffer2, &bcdescRV, &bvhCatalogueSRV2));
+    DXUT_SetDebugName(bvhCatalogueSRV1, "BVHCatalogue SRV1");
+    DXUT_SetDebugName(bvhCatalogueSRV2, "BVHCatalogue SRV2");
 
     D3D11_SHADER_RESOURCE_VIEW_DESC bddescRV;
     ZeroMemory(&bddescRV, sizeof(bddescRV));
@@ -789,8 +808,10 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     bddescRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     bddescRV.Buffer.FirstElement = 0;
     bddescRV.Buffer.NumElements = offset;
-    V_RETURN(pd3dDevice->CreateShaderResourceView(bvhDataBuffer, &bddescRV, &bvhDataSRV));
-    DXUT_SetDebugName(bvhDataSRV, "BVHData SRV");
+    V_RETURN(pd3dDevice->CreateShaderResourceView(bvhDataBuffer1, &bddescRV, &bvhDataSRV1));
+    V_RETURN(pd3dDevice->CreateShaderResourceView(bvhDataBuffer2, &bddescRV, &bvhDataSRV2));
+    DXUT_SetDebugName(bvhDataSRV1, "BVHData SRV1");
+    DXUT_SetDebugName(bvhDataSRV2, "BVHData SRV2");
 
     // UAV for Particle data
     D3D11_UNORDERED_ACCESS_VIEW_DESC DescUAV;
@@ -828,8 +849,10 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     bcdescUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
     bcdescUAV.Buffer.FirstElement = 0;
     bcdescUAV.Buffer.NumElements = objectCount;
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(bvhCatalogueBuffer, &bcdescUAV, &bvhCatalogueUAV));
-    DXUT_SetDebugName(bvhCatalogueUAV, "BVHCatalogue UAV");
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(bvhCatalogueBuffer1, &bcdescUAV, &bvhCatalogueUAV1));
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(bvhCatalogueBuffer2, &bcdescUAV, &bvhCatalogueUAV2));
+    DXUT_SetDebugName(bvhCatalogueUAV1, "BVHCatalogue UAV1");
+    DXUT_SetDebugName(bvhCatalogueUAV2, "BVHCatalogue UAV2");
 
     D3D11_UNORDERED_ACCESS_VIEW_DESC bddescUAV;
     ZeroMemory(&bddescUAV, sizeof(D3D11_UNORDERED_ACCESS_VIEW_DESC));
@@ -837,8 +860,10 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     bddescUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
     bddescUAV.Buffer.FirstElement = 0;
     bddescUAV.Buffer.NumElements = offset;
-    V_RETURN(pd3dDevice->CreateUnorderedAccessView(bvhDataBuffer, &bddescUAV, &bvhDataUAV));
-    DXUT_SetDebugName(bvhDataUAV, "BVHData UAV");
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(bvhDataBuffer1, &bddescUAV, &bvhDataUAV1));
+    V_RETURN(pd3dDevice->CreateUnorderedAccessView(bvhDataBuffer2, &bddescUAV, &bvhDataUAV2));
+    DXUT_SetDebugName(bvhDataUAV1, "BVHData UAV1");
+    DXUT_SetDebugName(bvhDataUAV2, "BVHData UAV2");
 
 
     return hr;
@@ -1190,8 +1215,10 @@ void CALLBACK OnD3D11DestroyDevice(void* pUserContext)
     SAFE_RELEASE(depthStencilState);
     SAFE_RELEASE(samplerState);
     SAFE_RELEASE(particleTextureSRV);
-    SAFE_RELEASE(bvhCatalogueBuffer);
-    SAFE_RELEASE(bvhDataBuffer);
+    SAFE_RELEASE(bvhCatalogueBuffer1);
+    SAFE_RELEASE(bvhCatalogueBuffer2);
+    SAFE_RELEASE(bvhDataBuffer1);
+    SAFE_RELEASE(bvhDataBuffer2);
     SAFE_RELEASE(csConstantBuffer);
     SAFE_RELEASE(gsConstantBuffer);
     SAFE_RELEASE(indexerBuffer);
@@ -1203,8 +1230,10 @@ void CALLBACK OnD3D11DestroyDevice(void* pUserContext)
     SAFE_RELEASE(particleBuffer2);
     SAFE_RELEASE(pickingRTV1);
     SAFE_RELEASE(pickingRTV2);
-    SAFE_RELEASE(bvhCatalogueSRV);
-    SAFE_RELEASE(bvhDataSRV);
+    SAFE_RELEASE(bvhCatalogueSRV1);
+    SAFE_RELEASE(bvhCatalogueSRV2);
+    SAFE_RELEASE(bvhDataSRV1);
+    SAFE_RELEASE(bvhDataSRV2);
     SAFE_RELEASE(indexerSRV);
     SAFE_RELEASE(masscube1SRV1);
     SAFE_RELEASE(masscube1SRV2);
@@ -1216,8 +1245,10 @@ void CALLBACK OnD3D11DestroyDevice(void* pUserContext)
     SAFE_RELEASE(pickingSRV2);
     SAFE_RELEASE(pickingTexture1);
     SAFE_RELEASE(pickingTexture2);
-    SAFE_RELEASE(bvhCatalogueUAV);
-    SAFE_RELEASE(bvhDataUAV);
+    SAFE_RELEASE(bvhCatalogueUAV1);
+    SAFE_RELEASE(bvhCatalogueUAV2);
+    SAFE_RELEASE(bvhDataUAV1);
+    SAFE_RELEASE(bvhDataUAV2);
     SAFE_RELEASE(masscube1UAV1);
     SAFE_RELEASE(masscube1UAV2);
     SAFE_RELEASE(masscube2UAV1);

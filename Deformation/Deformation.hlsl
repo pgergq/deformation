@@ -8,7 +8,6 @@
 //--------------------------------------------------------------------------------------
 
 
-
 // volcube neighbouring data
 #define NB_SAME_LEFT			0x20
 #define NB_SAME_RIGHT			0x10
@@ -28,8 +27,6 @@
 // constants
 #define exp_mul					0.05f		// default: 0.05f
 #define exp_max					1000000		// default: 1000000
-//#define gravity					-1000		// default: -1000
-//#define tablepos				-1000       // default: -1000
 
 // constant buffer structure
 cbuffer cbCS : register(b0)
@@ -53,15 +50,8 @@ cbuffer cbCS : register(b0)
 	float4 eye_pos;
 };
 
-// masspoint structure
-struct MassPoint
-{
-	float4 oldpos;
-	float4 newpos;
-	float4 acc;
-	uint neighbour_same;
-	uint neighbour_other;
-};
+// include structure definitions
+#include "Structures.hlsl"
 
 // attached buffers
 StructuredBuffer<MassPoint> ovolcube1	: register(t0);
@@ -71,8 +61,6 @@ Texture2D<float4> vertexID2				: register(t3);
 RWStructuredBuffer<MassPoint> volcube1	: register(u0);
 RWStructuredBuffer<MassPoint> volcube2	: register(u1);
 
-// include collision detection file
-#include "Collision.hlsl"
 
 // Return force/acceleration affecting the first input vertex (mass spring system, spring between the two vertices)
 float3 acceleration(MassPoint a, MassPoint b, uint mode)
