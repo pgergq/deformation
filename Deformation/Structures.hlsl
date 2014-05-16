@@ -7,6 +7,30 @@
 //--------------------------------------------------------------------------------------
 
 
+// constant buffer for compute shaders
+cbuffer cbCS : register(b0)
+{
+    uint cube_width;
+    uint cube_cell_size;
+    uint object_count;
+
+    uint is_picking;
+    uint pick_origin_x;
+    uint pick_origin_y;
+
+    float stiffness;
+    float damping;
+    float dt;
+    float im;
+    float gravity;
+    float table_pos;
+    float collision_range;
+
+    float3 dummy;
+
+    float4 pick_dir;
+    float4 eye_pos;
+};
 
 // masspoint structure
 struct MassPoint
@@ -40,9 +64,9 @@ struct Indexer
 
 // BVHData entry (bounding box)
 struct BVBox {
-    int left_id;            // masspoint ID of left child (-1: not leaf)
+    int left_id;            // masspoint ID of left child (-1: not leaf), index in masscube!
     int left_type;          // masspoint type (1st or second masscube)
-    int right_id;           // masspoint ID of right child
+    int right_id;           // masspoint ID of right child, index in masscube!
     int right_type;         // masspoint type
     float min_x;            // bounding box coordinates
     float max_x;            // bounding box coordinates

@@ -10,32 +10,11 @@
 #define maxv2	(cube_width+1)*(cube_width+1)*(cube_width+1)
 
 
-cbuffer cbCS : register(b0)
-{
-    uint cube_width;
-    uint cube_cell_size;
-    uint object_count;
-
-    uint is_picking;
-    uint pick_origin_x;
-    uint pick_origin_y;
-
-    float stiffness;
-    float damping;
-    float dt;
-    float im;
-    float gravity;
-    float table_pos;
-
-    float4 pick_dir;
-    float4 eye_pos;
-};
-
 // include structure definitions
 #include "Structures.hlsl"
 
-RWStructuredBuffer<Particle>  particles	: register(u0);
-StructuredBuffer<Indexer>     indexer	: register(t0);
+RWStructuredBuffer<Particle> particles	: register(u0);
+StructuredBuffer<Indexer> indexer   	: register(t0);
 RWStructuredBuffer<MassPoint> volcube1	: register(u1);
 RWStructuredBuffer<MassPoint> volcube2	: register(u2);
 

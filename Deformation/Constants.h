@@ -83,6 +83,9 @@ struct CB_CS
     float im;                       // inverse mass of masspoints
     float gravity;                  // F(gravity) = (0, gravity, 0)
     float tablePos;                 // table position = (0, tablePos, 0)
+    float collisionRange;           // collision effect range constant
+
+    XMFLOAT3 dummy;
 
     XMFLOAT4 pickDir;               // picking vector direction
     XMFLOAT4 eyePos;                // eye position

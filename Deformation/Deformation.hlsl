@@ -28,28 +28,6 @@
 #define exp_mul					0.05f		// default: 0.05f
 #define exp_max					1000000		// default: 1000000
 
-// constant buffer structure
-cbuffer cbCS : register(b0)
-{
-	uint cube_width;
-	uint cube_cell_size;
-	uint object_count;
-
-	uint is_picking;
-	uint pick_origin_x;
-	uint pick_origin_y;
-
-    float stiffness;
-    float damping;
-    float dt;
-    float im;
-    float gravity;
-    float table_pos;
-
-	float4 pick_dir;
-	float4 eye_pos;
-};
-
 // include structure definitions
 #include "Structures.hlsl"
 

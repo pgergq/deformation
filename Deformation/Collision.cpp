@@ -16,32 +16,9 @@
 #include "Constants.h"
 
 
-//--------------------------------------------------------------------------------------
-// Constructor1: malloc tree memory, build tree, sort tree
-//--------------------------------------------------------------------------------------
-//BVHierarchy::BVHierarchy(MassVector masspoints){
-//    
-//    // Mass[] -> Mass+ID[]
-//    MassIDTypeVector x;
-//    uint size = masspoints.size();
-//    // extend array to contain power-of-2 number elements
-//    uint ext = std::exp2(std::ceil(std::log2(size))) - size;
-//    x.reserve(size+ext);
-//    for (uint i = 0; i < size; i++){
-//        x.push_back(MassID(i, masspoints[i]));
-//    }
-//    for (uint i = 0; i < ext; i++){
-//        x.push_back(MassID(-1, MASSPOINT{}));
-//    }
-//
-//    // sort and structurise input
-//    bvh = sort(x, 0);
-//
-//}
-
 
 //--------------------------------------------------------------------------------------
-// Constructor2: malloc tree memory, build tree, sort tree (<- USE THIS)
+// Constructor: malloc tree memory, build tree, sort tree (<- USE THIS)
 //--------------------------------------------------------------------------------------
 BVHierarchy::BVHierarchy(MassIDTypeVector masspoints){
 
