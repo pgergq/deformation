@@ -14,6 +14,7 @@
 
 #include <cfloat>
 #include <vector>
+#include <atomic>
 #include <tuple>
 #include <DirectXMath.h>
 
@@ -48,23 +49,48 @@ using namespace DirectX;
 
 
 // some constants
-extern float spreadConstant;
-extern float stiffnessConstant;
-extern float dampingConstant;
-extern float invMassConstant;
-extern float collisionRangeConstant;
-extern float gravityConstant;
-extern float tablePositionConstant;
-
+extern std::atomic<float> spreadConstant;
+extern std::atomic<float> stiffnessConstant;
+extern std::atomic<float> dampingConstant;
+extern std::atomic<float> invMassConstant;
+extern std::atomic<float> collisionRangeConstant;
+extern std::atomic<float> gravityConstant;
+extern std::atomic<float> tablePositionConstant;
 
 
 // Helper structures
+struct VECTOR3
+{
+    float x;
+    float y;
+    float z;
+    VECTOR3(float _x = 0.0f, float _y = 0.0f, float _z = 0.0f) : x(_x), y(_y), z(_z) {}
+    VECTOR3(const VECTOR3& v) : x(v.x), y(v.y), z(v.z) {}
+    VECTOR3 operator+(const VECTOR3& v) { return VECTOR3(x + v.x, y + v.y, z + v.z); }
+    VECTOR3 operator-(const VECTOR3& v) { return VECTOR3(x - v.x, y - v.y, z - v.z); }
+    VECTOR3 operator*(const VECTOR3& v) { return VECTOR3(x * v.x, y * v.y, z * v.z); }
+};
+
+struct VECTOR4
+{
+    float x;
+    float y;
+    float z;
+    float w;
+    VECTOR4(float _x = 0.0f, float _y = 0.0f, float _z = 0.0f, float _w = 0.0f) : x(_x), y(_y), z(_z), w(_w) {}
+    VECTOR4(const VECTOR4& v) : x(v.x), y(v.y), z(v.z), w(v.w) {}
+    VECTOR4 operator+(const VECTOR4& v) { return VECTOR4(x + v.x, y + v.y, z + v.z, w + v.w); }
+    VECTOR4 operator-(const VECTOR4& v) { return VECTOR4(x - v.x, y - v.y, z - v.z, w - v.w); }
+    VECTOR4 operator*(const VECTOR4& v) { return VECTOR4(x * v.x, y * v.y, z * v.z, w * v.w); }
+};
+
 struct CB_GS
 {
     XMFLOAT4X4 worldViewProjection; // world-view-projection matrix
     XMFLOAT4X4 inverseView;         // inverse view matrix
     XMFLOAT4 eyePos;                // current eye position
-    XMFLOAT4 lightPos;              // current light position
+    VECTOR4 lightPos;              // current light position
+    VECTOR4 lightCol;              // current light colour
 };
 
 struct CB_CS
@@ -161,5 +187,8 @@ typedef std::vector<BVBOX> BVBoxVector;                 // vectorized
 typedef std::tuple<int, int, MASSPOINT> MassIDType;     // Masspoint ID (index in masscube), Type (1st or 2nd masscube), Masspoint (data)
 typedef std::vector<MassIDType> MassIDTypeVector;       // vectorized
 
+// more variables
+extern std::atomic<VECTOR4> lightPos;
+extern std::atomic<VECTOR4> lightCol;
 
 #endif

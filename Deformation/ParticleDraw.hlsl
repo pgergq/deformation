@@ -51,6 +51,7 @@ cbuffer cb0
 	row_major float4x4 g_mInvView;
 	float4 eyepos;
 	float4 lightpos;
+    float4 lightcol;
 };
 
 cbuffer cb1
@@ -85,7 +86,7 @@ float4 PhongBlinn(float3 n, float3 h, float3 l){
 	float4 kd = float4(0.61424, 0.04136, 0.04136, 0.55);
 	float4 ks = float4(0.727811, 0.626959, 0.626959, 0.55);
 	float shininess = 76.8;
-	return ka + kd * saturate(dot(n, l)) + ks * pow(saturate(dot(n, h)), shininess);
+	return (ka + kd * saturate(dot(n, l)) + ks * pow(saturate(dot(n, h)), shininess)) * lightcol;
 }
 
 //

@@ -24,6 +24,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <atomic>
 #include <array>
 #include <time.h>
 #include "Deformable.h"
@@ -115,7 +116,7 @@ int                                 pickOriginX;                    // mouse cli
 int                                 pickOriginY;                    //     ...     y           ...
 bool                                isPicking = false;              // RBUTTON is pressed
 bool                                renderPicking = false;          // render model to texture for picking
-XMFLOAT4                            lightPos(0, 0, -10000, 1);      // light position
+
 
 // Debug file
 std::ofstream                       debug;
@@ -319,7 +320,7 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
     ID3D11ShaderResourceView* bvhSRViewNULL[4] = { nullptr, nullptr, nullptr, nullptr };
     pd3dImmediateContext->CSSetShaderResources(0, 4, bvhSRViewNULL);
     ID3D11UnorderedAccessView* bvhUAViewNULL[2] = { nullptr, nullptr };
-    pd3dImmediateContext->CSSetUnorderedAccessViews(0, 4, bvhUAViewNULL, (UINT*)(bvhUAViews));
+    pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, bvhUAViewNULL, (UINT*)(bvhUAViews));
 
     std::swap(bvhCatalogueBuffer1, bvhCatalogueBuffer2);
     std::swap(bvhCatalogueSRV1, bvhCatalogueSRV2);
@@ -400,11 +401,12 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
 {
     XMVECTOR lookat = camera.GetLookAtPt();
     XMVECTOR eye = XMVectorSet(0, 0, 0, 0);
-    XMVECTOR x = XMVectorSet(200, 0, 0, 0);
-    XMVECTOR y = XMVectorSet(0, 200, 0, 0);
-    XMVECTOR v;
+    VECTOR4 x(400, 0, 0, 0);
+    VECTOR4 y(0, 400, 0, 0);
+    VECTOR4 v = lightPos.load();
     switch (nChar){
-        case VK_LEFT:
+        // camera translation
+        /*case VK_LEFT:
             v = XMVectorSubtract(camera.GetEyePt(), x);
             XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
             camera.SetViewParams(eye, lookat);
@@ -423,6 +425,20 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
             v = XMVectorSubtract(camera.GetEyePt(), y);
             XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
             camera.SetViewParams(eye, lookat);
+            break;*/
+
+        // light translation
+        case VK_LEFT:
+            lightPos.store(v - x);
+            break;
+        case VK_RIGHT:
+            lightPos.store(v + x);
+            break;
+        case VK_UP:
+            lightPos.store(v + y);
+            break;
+        case VK_DOWN:
+            lightPos.store(v - y);
             break;
         case 0x58:    // 'X' key
         {
@@ -498,10 +514,10 @@ HRESULT importFiles(){
     deformableObjects.push_back(body2);
 
     //set up third bunny
-    //Deformable body3("bunny_res3_scaled.obj", 2);
-    //body3.build();
-    //body3.translate(0, 2000, 0);
-    //deformableObjects.push_back(body3);
+    Deformable body3("bunny_res3_scaled.obj", 2);
+    body3.build();
+    body3.translate(0, 2000, 0);
+    deformableObjects.push_back(body3);
 
     // Set variables
     objectCount = deformableObjects.size();
@@ -1123,6 +1139,7 @@ bool drawPicking(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
     XMStoreFloat4x4(&pCBGS->inverseView, XMMatrixInverse(nullptr, mView));
     XMStoreFloat4(&pCBGS->eyePos, camera.GetEyePt());
     pCBGS->lightPos = lightPos;
+    pCBGS->lightCol = lightCol;
     pd3dImmediateContext->Unmap(gsConstantBuffer, 0);
     pd3dImmediateContext->GSSetConstantBuffers(0, 1, &gsConstantBuffer);
 
@@ -1184,6 +1201,7 @@ bool drawObjects(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
     XMStoreFloat4x4(&pCBGS->inverseView, XMMatrixInverse(nullptr, mView));
     XMStoreFloat4(&pCBGS->eyePos, camera.GetEyePt());
     pCBGS->lightPos = lightPos;
+    pCBGS->lightCol = lightCol;
     pd3dImmediateContext->Unmap(gsConstantBuffer, 0);
     pd3dImmediateContext->GSSetConstantBuffers(0, 1, &gsConstantBuffer);
 

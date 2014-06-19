@@ -39,13 +39,20 @@ void BVHUpdate(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 G
 
                 BVBox tmp = bvhdata[offset + leveloffset + i];
                 MassPoint ml, mr;
-                if (tmp.left_id != (-1) && tmp.left_type != 0){ // left child valid, read from masscube data
+                if (tmp.left_id != (-1) && tmp.left_type == 1){ // left child valid, read from masscube data
                     // index: objnum * masscube1_size + index_in_cube
-                    ml = tmp.left_type == 1 ? volcube1[objnum*cube_width*cube_width*cube_width + tmp.left_id] : volcube2[objnum*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + tmp.left_id];
+                    ml = volcube1[objnum*cube_width*cube_width*cube_width + tmp.left_id];
                 }
-                if (tmp.right_id != (-1) && tmp.right_type != 0){ // right child valid, read from masscube data
+                else if (tmp.left_id != (-1) && tmp.left_type == 2){
+                    ml = volcube2[objnum*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + tmp.left_id];
+                }
+
+                if (tmp.right_id != (-1) && tmp.right_type == 1){ // right child valid, read from masscube data
                     // index: objnum * masscube(1|2)_size + index_in_cube
-                    mr = tmp.right_type == 1 ? volcube1[objnum*cube_width*cube_width*cube_width + tmp.right_id] : volcube2[objnum*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + tmp.right_id];
+                    mr = volcube1[objnum*cube_width*cube_width*cube_width + tmp.right_id];
+                }
+                else if (tmp.right_id != (-1) && tmp.right_type == 2){
+                    mr = volcube2[objnum*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + tmp.right_id];
                 }
 
                 bvhdata[offset + leveloffset + i].min_x = min(ml.newpos.x, mr.newpos.x) - collision_range;
