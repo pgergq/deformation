@@ -33,6 +33,7 @@
     <ClInclude Include="Deformable.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="Collision.h" />
+    <ClInclude Include="IPCServer.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ParticleDraw.hlsl">
@@ -53,5 +54,6 @@
     <ClCompile Include="Deformable.cpp" />
     <ClCompile Include="Constants.cpp" />
     <ClCompile Include="Collision.cpp" />
+    <ClCompile Include="IPCServer.cpp" />
   </ItemGroup>
 </Project>

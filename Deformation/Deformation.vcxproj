@@ -383,9 +383,11 @@
       <PrecompiledHeaderOutputFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
     </ClCompile>
     <ClCompile Include="Deformation.cpp" />
+    <ClCompile Include="IPCServer.cpp" />
     <ClInclude Include="Collision.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="Deformable.h" />
+    <ClInclude Include="IPCServer.h" />
     <CLInclude Include="WaitDlg.h" />
   </ItemGroup>
   <ItemGroup>
