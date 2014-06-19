@@ -1,7 +1,8 @@
 
 ##`[deformation]`
 > Soft-body deformation with `DirectCompute`
-
+> Details: [`wiki page`](https://github.com/pgergq/deformation/wiki "deformation wiki")
+> Manager GUI: [`deformationconsole`](https://github.com/pgergq/deformationconsole "deformationconsole project")
 
 
 **changelog**:
