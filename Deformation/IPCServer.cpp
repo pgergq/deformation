@@ -21,14 +21,17 @@ HRESULT StartServer(){
 
     bool fConnected = false;
     const wchar_t* pipeName = L"\\\\.\\pipe\\deformablepipe";
+    std::wstring out = L"";
 
     /// create named pipe
-    std::cout << "\n[.] PipeServer: initialized at [" << pipeName << "]" << std::endl;
+    out = L"\n[.] PipeServer: initialized at [" + std::wstring(pipeName) + L"]\n";
+    OutputDebugString(out.c_str());
     hPipe = CreateNamedPipe(pipeName, PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, BUFSIZE, BUFSIZE, 0, nullptr);
 
     if (hPipe == INVALID_HANDLE_VALUE)
     {
-        std::cout << "[!] CreateNamedPipe failed, GLE=" << GetLastError() << std::endl;
+        out = L"[!] CreateNamedPipe failed\n";
+        OutputDebugString(out.c_str());
         return E_FAIL;
     }
 
@@ -36,13 +39,14 @@ HRESULT StartServer(){
     fConnected = ConnectNamedPipe(hPipe, nullptr) ? true : (GetLastError() == ERROR_PIPE_CONNECTED);
     if (fConnected)
     {
-        std::cout << "[.] PipeServer: client connected." << std::endl;
-
+        out = L"[.] PipeServer: client connected\n";
+        OutputDebugString(out.c_str());
     }
     else
         CloseHandle(hPipe);
 
-    std::cout << "[.] PipeServer: processing messages..." << std::endl;
+    out = L"[.] PipeServer: processing messages\n";
+    OutputDebugString(out.c_str());
     return S_OK;
 }
 
@@ -125,12 +129,10 @@ std::tuple<std::wstring, std::wstring> ProcessCommand(byte* buf, int validBytes)
         }
         else if (param == "damping")
         {
-            //#TODO
             reply = std::to_wstring(dampingConstant);
         }
         else if (param == "gravity")
         {
-            //#TODO
             reply = std::to_wstring(gravityConstant);
         }
         else if (param == "lightpos")
@@ -172,6 +174,7 @@ void InstanceThread(LPVOID lpvParam)
     HANDLE hHeap = GetProcessHeap();
     wchar_t* pchRequest = (wchar_t*)HeapAlloc(hHeap, 0, BUFSIZE * sizeof(wchar_t));
     wchar_t* pchReply = (wchar_t*)HeapAlloc(hHeap, 0, BUFSIZE * sizeof(wchar_t));
+    std::wstring out = L"";
 
     DWORD cbBytesRead = 0, cbReplyBytes = 0, cbWritten = 0;
     bool fSuccess = false;
@@ -180,7 +183,8 @@ void InstanceThread(LPVOID lpvParam)
     /// error checking
     if (pchRequest == nullptr || pchReply == nullptr || lpvParam == nullptr)
     {
-        std::cout << "[!] PipeServer: memory allocation error." << std::endl;
+        out = L"[!] PipeServer: memory allocation error\n";
+        OutputDebugString(out.c_str());
         if (pchReply != nullptr) HeapFree(hHeap, 0, pchReply);
         if (pchRequest != nullptr) HeapFree(hHeap, 0, pchRequest);
         return;
@@ -197,10 +201,14 @@ void InstanceThread(LPVOID lpvParam)
         fSuccess = ReadFile(hlPipe, pchRequest, BUFSIZE * sizeof(wchar_t), &cbBytesRead, nullptr);
         if (!fSuccess || cbBytesRead == 0)
         {
-            if (GetLastError() == ERROR_BROKEN_PIPE)
-                std::cout << "[.] PipeServer: client disconnected." << std::endl;
-            else
-                std::cout << "[!] PipeServer: reading error" << std::endl;
+            if (GetLastError() == ERROR_BROKEN_PIPE){
+                out = L"[.] PipeServer: client disconnected\n";
+                OutputDebugString(out.c_str());
+            }
+            else{
+                out = L"[!] PipeServer: reading error\n";
+                OutputDebugString(out.c_str());
+            }
             break;
         }
 
@@ -215,11 +223,13 @@ void InstanceThread(LPVOID lpvParam)
         fSuccess = WriteFile(hlPipe, reply, replyBytes, &cbWritten, nullptr);
         if (!fSuccess || replyBytes != cbWritten)
         {
-            std::cout << "[!] PipeServer: writing error" << std::endl;
+            out = L"[!] PipeServer: writing error\n";
+            OutputDebugString(out.c_str());
             break;
         }
 
-        std::cout << "[.] Command [" << std::string(req.begin(), req.end()) << "] processed: " << std::string(rep.begin(), rep.end()) << std::endl;
+        out = L"[.] Command [" + req + L"] processed: " + rep + L"\n";
+        OutputDebugString(out.c_str());
     }
 
     FlushFileBuffers(hlPipe);
@@ -229,6 +239,7 @@ void InstanceThread(LPVOID lpvParam)
     HeapFree(hHeap, 0, pchRequest);
     HeapFree(hHeap, 0, pchReply);
 
-    std::cout << "[.] InstanceThread exiting." << std::endl;
+    out = L"[.] InstanceThread exiting\n";
+    OutputDebugString(out.c_str());
     return;
 }
