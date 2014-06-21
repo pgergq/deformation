@@ -13,6 +13,7 @@
 
 
 HANDLE hPipe = INVALID_HANDLE_VALUE;
+bool isReceiving = true;
 
 //--------------------------------------------------------------------------------------
 // StartServer: Host NamedPipe server and accept commands
@@ -35,17 +36,18 @@ HRESULT StartServer(){
         return E_FAIL;
     }
 
-    /// connect client
+    /// connect client (blocking)
     fConnected = ConnectNamedPipe(hPipe, nullptr) ? true : (GetLastError() == ERROR_PIPE_CONNECTED);
     if (fConnected)
     {
         out = L"[.] PipeServer: client connected\n";
         OutputDebugString(out.c_str());
+        InstanceThread(hPipe);
     }
     else
         CloseHandle(hPipe);
 
-    out = L"[.] PipeServer: processing messages\n";
+    out = L"[.] PipeServer: init ended\n";
     OutputDebugString(out.c_str());
     return S_OK;
 }
@@ -196,7 +198,7 @@ void InstanceThread(LPVOID lpvParam)
     hlPipe = (HANDLE)lpvParam;
 
     /// buffer reading cycle
-    while (true)
+    while (isReceiving)
     {
         fSuccess = ReadFile(hlPipe, pchRequest, BUFSIZE * sizeof(wchar_t), &cbBytesRead, nullptr);
         if (!fSuccess || cbBytesRead == 0)

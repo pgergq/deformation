@@ -24,12 +24,15 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <thread>
+#include <future>
 #include <atomic>
 #include <array>
 #include <time.h>
 #include "Deformable.h"
 #include "Constants.h"
 #include "Collision.h"
+#include "IPCServer.h"
 
 
 using namespace DirectX;
@@ -116,6 +119,7 @@ int                                 pickOriginX;                    // mouse cli
 int                                 pickOriginY;                    //     ...     y           ...
 bool                                isPicking = false;              // RBUTTON is pressed
 bool                                renderPicking = false;          // render model to texture for picking
+bool                                isFocused = true;               // window focused state
 
 
 // Debug file
@@ -170,8 +174,21 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     DXUTCreateWindow(L"Project Deformation");
     DXUTCreateDevice(D3D_FEATURE_LEVEL_11_0, true, 800, 600);
 
+    //// Start IPC-server
+    //std::thread s(StartServer);
+
     // Enter into the DXUT render loop
     DXUTMainLoop();
+
+    //// Signal termination to the IPC-server
+    //isReceiving = false;
+
+    //// Wait for the IPC-processing thread to finish
+    //if (s.joinable()){
+    //    s.join();
+    //    OutputDebugString(L"[.] Exiting application\n");
+    //}
+
 
     return DXUTGetExitCode();
 }
@@ -202,136 +219,139 @@ bool CALLBACK ModifyDeviceSettings(DXUTDeviceSettings* pDeviceSettings, void* pU
 //--------------------------------------------------------------------------------------
 void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
 {
-    HRESULT hr;
+    if (isFocused)
+    {
+        HRESULT hr;
 
-    auto pd3dImmediateContext = DXUTGetD3D11DeviceContext();
+        auto pd3dImmediateContext = DXUTGetD3D11DeviceContext();
 
-    //--------------------------------------------------------------------------------------
-    // EXECUTE FIRST COMPUTE SHADER: UPDATE VOLUMETRIC MODELS
-    pd3dImmediateContext->CSSetShader(physicsCS1, nullptr, 0);
+        //--------------------------------------------------------------------------------------
+        // EXECUTE FIRST COMPUTE SHADER: UPDATE VOLUMETRIC MODELS
+        pd3dImmediateContext->CSSetShader(physicsCS1, nullptr, 0);
 
-    ID3D11ShaderResourceView* srvs[4] = { masscube1SRV2, masscube2SRV2, pickingSRV1, pickingSRV2 };
-    pd3dImmediateContext->CSSetShaderResources(0, 4, srvs);
+        ID3D11ShaderResourceView* srvs[4] = { masscube1SRV2, masscube2SRV2, pickingSRV1, pickingSRV2 };
+        pd3dImmediateContext->CSSetShaderResources(0, 4, srvs);
 
-    ID3D11UnorderedAccessView* aUAViews[2] = { masscube1UAV1, masscube2UAV1 };
-    pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, aUAViews, (UINT*)(&aUAViews));
+        ID3D11UnorderedAccessView* aUAViews[2] = { masscube1UAV1, masscube2UAV1 };
+        pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, aUAViews, (UINT*)(&aUAViews));
 
-    // For CS constant buffer
-    D3D11_MAPPED_SUBRESOURCE MappedResource;
-    V(pd3dImmediateContext->Map(csConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource));
-    auto pcbCS = reinterpret_cast<CB_CS*>(MappedResource.pData);
+        // For CS constant buffer
+        D3D11_MAPPED_SUBRESOURCE MappedResource;
+        V(pd3dImmediateContext->Map(csConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource));
+        auto pcbCS = reinterpret_cast<CB_CS*>(MappedResource.pData);
 
-    // Update CS constant buffer
-    pcbCS->cubeWidth = VCUBEWIDTH;
-    pcbCS->cubeCellSize = cubeCellSize;
-    pcbCS->objectCount = objectCount;
-    pcbCS->stiffness = stiffnessConstant;
-    pcbCS->damping = dampingConstant;
-    pcbCS->dt = fElapsedTime;
-    pcbCS->im = invMassConstant;
-    pcbCS->gravity = gravityConstant;
-    pcbCS->tablePos = tablePositionConstant;
-    pcbCS->collisionRange = collisionRangeConstant;
+        // Update CS constant buffer
+        pcbCS->cubeWidth = VCUBEWIDTH;
+        pcbCS->cubeCellSize = cubeCellSize;
+        pcbCS->objectCount = objectCount;
+        pcbCS->stiffness = stiffnessConstant;
+        pcbCS->damping = dampingConstant;
+        pcbCS->dt = fElapsedTime;
+        pcbCS->im = invMassConstant;
+        pcbCS->gravity = gravityConstant;
+        pcbCS->tablePos = tablePositionConstant;
+        pcbCS->collisionRange = collisionRangeConstant;
 
-    // Send picking data to GPU
-    if (isPicking)
-        pcbCS->isPicking = 1;
-    else
-        pcbCS->isPicking = 0;
+        // Send picking data to GPU
+        if (isPicking)
+            pcbCS->isPicking = 1;
+        else
+            pcbCS->isPicking = 0;
 
-    XMMATRIX view = camera.GetViewMatrix();     // V matrix
-    XMMATRIX proj = camera.GetProjMatrix();     // P matrix
-    XMVECTOR eye = camera.GetEyePt();           // eye pos
+        XMMATRIX view = camera.GetViewMatrix();     // V matrix
+        XMMATRIX proj = camera.GetProjMatrix();     // P matrix
+        XMVECTOR eye = camera.GetEyePt();           // eye pos
 
-    XMMATRIX viewproj = XMMatrixMultiply(view, proj);   // VP matrix
-    XMMATRIX trans = XMMatrixTranslation(XMVectorGetX(eye), XMVectorGetY(eye), XMVectorGetZ(eye));  // E matrix
+        XMMATRIX viewproj = XMMatrixMultiply(view, proj);   // VP matrix
+        XMMATRIX trans = XMMatrixTranslation(XMVectorGetX(eye), XMVectorGetY(eye), XMVectorGetZ(eye));  // E matrix
 
-    XMVECTOR pickdir = XMVectorSet((float)((2.0f*mouseClickX) / windowWidth) - 1.0f,
-        (-1)*((float)((2.0f*mouseClickY) / windowHeight) - 1.0f), 0, 1);    // current mouse ndc
-    trans = XMMatrixInverse(nullptr, XMMatrixMultiply(trans, viewproj));    // (E*VP)^-1
-    pickdir = XMVector3Normalize(XMVector4Transform(pickdir, trans));   // pick direction = cmouse_ndc * (E*VP)^-1  --> normalized
-    XMVectorSetW(pickdir, 1.0f);
+        XMVECTOR pickdir = XMVectorSet((float)((2.0f*mouseClickX) / windowWidth) - 1.0f,
+            (-1)*((float)((2.0f*mouseClickY) / windowHeight) - 1.0f), 0, 1);    // current mouse ndc
+        trans = XMMatrixInverse(nullptr, XMMatrixMultiply(trans, viewproj));    // (E*VP)^-1
+        pickdir = XMVector3Normalize(XMVector4Transform(pickdir, trans));   // pick direction = cmouse_ndc * (E*VP)^-1  --> normalized
+        XMVectorSetW(pickdir, 1.0f);
 
-    pcbCS->pickOriginX = pickOriginX;
-    pcbCS->pickOriginY = pickOriginY;
-    XMStoreFloat4(&pcbCS->pickDir, pickdir);
-    XMStoreFloat4(&pcbCS->eyePos, eye);
+        pcbCS->pickOriginX = pickOriginX;
+        pcbCS->pickOriginY = pickOriginY;
+        XMStoreFloat4(&pcbCS->pickDir, pickdir);
+        XMStoreFloat4(&pcbCS->eyePos, eye);
 
-    pd3dImmediateContext->Unmap(csConstantBuffer, 0);
-    ID3D11Buffer* ppCB[1] = { csConstantBuffer };
-    pd3dImmediateContext->CSSetConstantBuffers(0, 1, ppCB);
+        pd3dImmediateContext->Unmap(csConstantBuffer, 0);
+        ID3D11Buffer* ppCB[1] = { csConstantBuffer };
+        pd3dImmediateContext->CSSetConstantBuffers(0, 1, ppCB);
 
-    // Run first CS (first volcube)
-    pd3dImmediateContext->Dispatch(VCUBEWIDTH, VCUBEWIDTH, VCUBEWIDTH * objectCount);
+        // Run first CS (first volcube)
+        pd3dImmediateContext->Dispatch(VCUBEWIDTH, VCUBEWIDTH, VCUBEWIDTH * objectCount);
 
-    // Run second CS (second volcube)
-    pd3dImmediateContext->CSSetShader(physicsCS2, nullptr, 0);
-    pd3dImmediateContext->Dispatch((VCUBEWIDTH + 1), (VCUBEWIDTH + 1), (VCUBEWIDTH + 1) * objectCount);
+        // Run second CS (second volcube)
+        pd3dImmediateContext->CSSetShader(physicsCS2, nullptr, 0);
+        pd3dImmediateContext->Dispatch((VCUBEWIDTH + 1), (VCUBEWIDTH + 1), (VCUBEWIDTH + 1) * objectCount);
 
-    // Unbind resources for CS
-    ID3D11ShaderResourceView* srvnull[4] = { nullptr, nullptr, nullptr, nullptr };
-    pd3dImmediateContext->CSSetShaderResources(0, 4, srvnull);
+        // Unbind resources for CS
+        ID3D11ShaderResourceView* srvnull[4] = { nullptr, nullptr, nullptr, nullptr };
+        pd3dImmediateContext->CSSetShaderResources(0, 4, srvnull);
 
-    ID3D11UnorderedAccessView* ppUAViewNULL[2] = { nullptr, nullptr };
-    pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, ppUAViewNULL, (UINT*)(&aUAViews));
+        ID3D11UnorderedAccessView* ppUAViewNULL[2] = { nullptr, nullptr };
+        pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, ppUAViewNULL, (UINT*)(&aUAViews));
 
-    // SWAP resources
-    std::swap(masscube1Buffer1, masscube1Buffer2);
-    std::swap(masscube1SRV1, masscube1SRV2);
-    std::swap(masscube1UAV1, masscube1UAV2);
-    std::swap(masscube2Buffer1, masscube2Buffer2);
-    std::swap(masscube2SRV1, masscube2SRV2);
-    std::swap(masscube2UAV1, masscube2UAV2);
-    //--------------------------------------------------------------------------------------
+        // SWAP resources
+        std::swap(masscube1Buffer1, masscube1Buffer2);
+        std::swap(masscube1SRV1, masscube1SRV2);
+        std::swap(masscube1UAV1, masscube1UAV2);
+        std::swap(masscube2Buffer1, masscube2Buffer2);
+        std::swap(masscube2SRV1, masscube2SRV2);
+        std::swap(masscube2UAV1, masscube2UAV2);
+        //--------------------------------------------------------------------------------------
 
-    //--------------------------------------------------------------------------------------
-    // EXECUTE SECOND COMPUTE SHADER: UPDATE POSITIONS
-    pd3dImmediateContext->CSSetShader(updateCS, nullptr, 0);
+        //--------------------------------------------------------------------------------------
+        // EXECUTE SECOND COMPUTE SHADER: UPDATE POSITIONS
+        pd3dImmediateContext->CSSetShader(updateCS, nullptr, 0);
 
-    ID3D11ShaderResourceView* uaRViews[1] = { indexerSRV };
-    pd3dImmediateContext->CSSetShaderResources(0, 1, uaRViews);
-    ID3D11UnorderedAccessView* uaUAViews[3] = { particleUAV2, masscube1UAV1, masscube2UAV1 };
-    pd3dImmediateContext->CSSetUnorderedAccessViews(0, 3, uaUAViews, (UINT*)(&uaUAViews));
+        ID3D11ShaderResourceView* uaRViews[1] = { indexerSRV };
+        pd3dImmediateContext->CSSetShaderResources(0, 1, uaRViews);
+        ID3D11UnorderedAccessView* uaUAViews[3] = { particleUAV2, masscube1UAV1, masscube2UAV1 };
+        pd3dImmediateContext->CSSetUnorderedAccessViews(0, 3, uaUAViews, (UINT*)(&uaUAViews));
 
-    pd3dImmediateContext->Dispatch(particleCount, 1, 1);
+        pd3dImmediateContext->Dispatch(particleCount, 1, 1);
 
-    ID3D11UnorderedAccessView* uppUAViewNULL[3] = { nullptr, nullptr, nullptr };
-    pd3dImmediateContext->CSSetUnorderedAccessViews(0, 3, uppUAViewNULL, (UINT*)(&uaUAViews));
-    ID3D11ShaderResourceView* uppSRVNULL[1] = { nullptr };
-    pd3dImmediateContext->CSSetShaderResources(0, 1, uppSRVNULL);
+        ID3D11UnorderedAccessView* uppUAViewNULL[3] = { nullptr, nullptr, nullptr };
+        pd3dImmediateContext->CSSetUnorderedAccessViews(0, 3, uppUAViewNULL, (UINT*)(&uaUAViews));
+        ID3D11ShaderResourceView* uppSRVNULL[1] = { nullptr };
+        pd3dImmediateContext->CSSetShaderResources(0, 1, uppSRVNULL);
 
-    std::swap(particleBuffer1, particleBuffer2);
-    std::swap(particleSRV1, particleSRV2);
-    std::swap(particleUAV1, particleUAV2);
-    //--------------------------------------------------------------------------------------
+        std::swap(particleBuffer1, particleBuffer2);
+        std::swap(particleSRV1, particleSRV2);
+        std::swap(particleUAV1, particleUAV2);
+        //--------------------------------------------------------------------------------------
 
-    //--------------------------------------------------------------------------------------
-    // EXECUTE THIRD COMPUTE SHADER: UPDATE COLLISION DETECTION DATA
+        //--------------------------------------------------------------------------------------
+        // EXECUTE THIRD COMPUTE SHADER: UPDATE COLLISION DETECTION DATA
 
-    pd3dImmediateContext->CSSetShader(bvhCS, nullptr, 0);
+        pd3dImmediateContext->CSSetShader(bvhCS, nullptr, 0);
 
-    ID3D11ShaderResourceView* bvhRViews[4] = { masscube1SRV2, masscube2SRV2, bvhCatalogueSRV1, bvhDataSRV1 };
-    pd3dImmediateContext->CSSetShaderResources(0, 4, bvhRViews);
-    ID3D11UnorderedAccessView* bvhUAViews[2] = { bvhCatalogueUAV2, bvhDataUAV2 };
-    pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, bvhUAViews, (UINT*)(&bvhUAViews));
+        ID3D11ShaderResourceView* bvhRViews[4] = { masscube1SRV2, masscube2SRV2, bvhCatalogueSRV1, bvhDataSRV1 };
+        pd3dImmediateContext->CSSetShaderResources(0, 4, bvhRViews);
+        ID3D11UnorderedAccessView* bvhUAViews[2] = { bvhCatalogueUAV2, bvhDataUAV2 };
+        pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, bvhUAViews, (UINT*)(&bvhUAViews));
 
-    //***pd3dImmediateContext->Dispatch(objectCount, 1, 1);
+        //***pd3dImmediateContext->Dispatch(objectCount, 1, 1);
 
-    ID3D11ShaderResourceView* bvhSRViewNULL[4] = { nullptr, nullptr, nullptr, nullptr };
-    pd3dImmediateContext->CSSetShaderResources(0, 4, bvhSRViewNULL);
-    ID3D11UnorderedAccessView* bvhUAViewNULL[2] = { nullptr, nullptr };
-    pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, bvhUAViewNULL, (UINT*)(bvhUAViews));
+        ID3D11ShaderResourceView* bvhSRViewNULL[4] = { nullptr, nullptr, nullptr, nullptr };
+        pd3dImmediateContext->CSSetShaderResources(0, 4, bvhSRViewNULL);
+        ID3D11UnorderedAccessView* bvhUAViewNULL[2] = { nullptr, nullptr };
+        pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, bvhUAViewNULL, (UINT*)(bvhUAViews));
 
-    std::swap(bvhCatalogueBuffer1, bvhCatalogueBuffer2);
-    std::swap(bvhCatalogueSRV1, bvhCatalogueSRV2);
-    std::swap(bvhCatalogueUAV1, bvhCatalogueUAV2);
-    std::swap(bvhDataBuffer1, bvhDataBuffer2);
-    std::swap(bvhDataSRV1, bvhDataSRV2);
-    std::swap(bvhDataUAV1, bvhDataUAV2);
-    //--------------------------------------------------------------------------------------
+        std::swap(bvhCatalogueBuffer1, bvhCatalogueBuffer2);
+        std::swap(bvhCatalogueSRV1, bvhCatalogueSRV2);
+        std::swap(bvhCatalogueUAV1, bvhCatalogueUAV2);
+        std::swap(bvhDataBuffer1, bvhDataBuffer2);
+        std::swap(bvhDataSRV1, bvhDataSRV2);
+        std::swap(bvhDataUAV1, bvhDataUAV2);
+        //--------------------------------------------------------------------------------------
 
-    // Update the camera's position based on user input 
-    camera.FrameMove(fElapsedTime);
+        // Update the camera's position based on user input 
+        camera.FrameMove(fElapsedTime);
+    }
 }
 
 //--------------------------------------------------------------------------------------
@@ -351,7 +371,7 @@ void print_debug_file(const char* string)
 //--------------------------------------------------------------------------------------
 void print_debug_float(float out)
 {
-    std::wstringstream a; a << "[" << out << "]" << std::endl;
+    std::wstringstream a; a << "[.] " << out << std::endl;
     std::wstring b = a.str();
     OutputDebugString(b.c_str());
 }
@@ -361,7 +381,7 @@ void print_debug_float(float out)
 //--------------------------------------------------------------------------------------
 void print_debug_string(std::string out)
 {
-    std::wstringstream a; a << "[" << out.c_str() << "]" << std::endl;
+    std::wstringstream a; a << "[.] " << out.c_str() << std::endl;
     std::wstring b = a.str();
     OutputDebugString(b.c_str());
 }
@@ -387,6 +407,12 @@ LRESULT CALLBACK MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, boo
     else if (uMsg == WM_RBUTTONUP){
         isPicking = false;
     }
+    else if (uMsg == WM_KILLFOCUS){
+        isFocused = false;
+    }
+    else if (uMsg == WM_SETFOCUS){
+        isFocused = true;
+    }
 
     // Pass all windows messages to camera so it can respond to user input
     camera.HandleMessages(hWnd, uMsg, wParam, lParam);
@@ -399,14 +425,14 @@ LRESULT CALLBACK MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, boo
 //------------------------------------------------------
 void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserContext)
 {
-    XMVECTOR lookat = camera.GetLookAtPt();
-    XMVECTOR eye = XMVectorSet(0, 0, 0, 0);
+    /*XMVECTOR lookat = camera.GetLookAtPt();
+    XMVECTOR eye = XMVectorSet(0, 0, 0, 0);*/
     VECTOR4 x(400, 0, 0, 0);
     VECTOR4 y(0, 400, 0, 0);
     VECTOR4 v = lightPos.load();
     switch (nChar){
-        // camera translation
-        /*case VK_LEFT:
+        /*// camera translation
+        case VK_LEFT:
             v = XMVectorSubtract(camera.GetEyePt(), x);
             XMStoreFloat4(reinterpret_cast<XMFLOAT4*>(&eye), v);
             camera.SetViewParams(eye, lookat);
@@ -1238,6 +1264,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
     XMMATRIX mView = camera.GetViewMatrix();
     XMMATRIX mProj = camera.GetProjMatrix();
 
+
     // Render the model first for picking, only if RMBUTTONDOWN happened
     if (renderPicking){
         drawPicking(pd3dImmediateContext, mView, mProj);
@@ -1246,11 +1273,13 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
     // Render the particles
     drawObjects(pd3dImmediateContext, mView, mProj);
 
+
     // The following could be used to output fps stats into debug output window,
     // which is useful because you can then turn off all UI rendering as they cloud performance
     static DWORD dwTimefirst = GetTickCount();
     if (GetTickCount() - dwTimefirst > 3000)
     {
+        OutputDebugString(L"[.] ");
         OutputDebugString(DXUTGetFrameStats(DXUTIsVsyncEnabled()));
         OutputDebugString(L"\n");
         dwTimefirst = GetTickCount();

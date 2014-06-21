@@ -26,6 +26,7 @@
 
 extern HANDLE hPipe;
 extern std::vector<Deformable> deformableObjects;
+extern bool isReceiving;
 
 HRESULT StartServer();
 void InstanceThread(LPVOID);
