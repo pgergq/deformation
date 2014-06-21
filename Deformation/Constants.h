@@ -186,6 +186,7 @@ typedef std::vector<MASSPOINT> MassVector;              // vectorized
 typedef std::vector<BVBOX> BVBoxVector;                 // vectorized
 typedef std::tuple<int, int, MASSPOINT> MassIDType;     // Masspoint ID (index in masscube), Type (1st or 2nd masscube), Masspoint (data)
 typedef std::vector<MassIDType> MassIDTypeVector;       // vectorized
+typedef std::tuple<std::wstring, std::wstring> wstuple;
 
 // more variables
 extern std::atomic<VECTOR4> lightPos;

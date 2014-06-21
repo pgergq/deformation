@@ -54,7 +54,7 @@ HRESULT StartServer(){
 //--------------------------------------------------------------------------------------
 // ProcessCommand: Read commands from input buffer
 //--------------------------------------------------------------------------------------
-std::tuple<std::wstring, std::wstring> ProcessCommand(byte* buf, int validBytes){
+wstuple ProcessCommand(byte* buf, int validBytes){
 
     /// Get command from buffer command
     std::wstring request = L"";                         // incoming command
@@ -162,7 +162,7 @@ std::tuple<std::wstring, std::wstring> ProcessCommand(byte* buf, int validBytes)
 
     /// Reply
     reply = L"[" + request + L"] -> [" + reply + L"]";
-    return std::tuple<std::wstring, std::wstring>(request, reply);
+    return wstuple(request, reply);
 }
 
 
@@ -213,7 +213,7 @@ void InstanceThread(LPVOID lpvParam)
         }
 
         // process the incoming message
-        std::tuple<std::wstring, std::wstring> tmp = ProcessCommand((byte*)pchRequest, cbBytesRead);
+        wstuple tmp = ProcessCommand((byte*)pchRequest, cbBytesRead);
         std::wstring req = std::get<0>(tmp);
         std::wstring rep = std::get<1>(tmp);
         const wchar_t* reply = rep.c_str();

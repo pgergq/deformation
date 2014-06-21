@@ -29,7 +29,7 @@ extern std::vector<Deformable> deformableObjects;
 
 HRESULT StartServer();
 void InstanceThread(LPVOID);
-std::tuple<std::wstring, std::wstring> ProcessCommand(byte*, int);
+wstuple ProcessCommand(byte*, int);
 
 
 #endif
