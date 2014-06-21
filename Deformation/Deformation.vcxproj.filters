@@ -34,6 +34,7 @@
     <ClInclude Include="Constants.h" />
     <ClInclude Include="Collision.h" />
     <ClInclude Include="IPCServer.h" />
+    <ClInclude Include="IPCClient.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ParticleDraw.hlsl">
@@ -55,5 +56,6 @@
     <ClCompile Include="Constants.cpp" />
     <ClCompile Include="Collision.cpp" />
     <ClCompile Include="IPCServer.cpp" />
+    <ClCompile Include="IPCClient.cpp" />
   </ItemGroup>
 </Project>

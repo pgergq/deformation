@@ -32,7 +32,7 @@
 #include "Deformable.h"
 #include "Constants.h"
 #include "Collision.h"
-#include "IPCServer.h"
+#include "IPCClient.h"
 
 
 using namespace DirectX;
@@ -174,21 +174,15 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     DXUTCreateWindow(L"Project Deformation");
     DXUTCreateDevice(D3D_FEATURE_LEVEL_11_0, true, 800, 600);
 
-    //// Start IPC-server
-    //std::thread s(StartServer);
+    // IPCClient start
+    std::thread t(IPCPipeClient);
 
     // Enter into the DXUT render loop
     DXUTMainLoop();
 
-    //// Signal termination to the IPC-server
-    //isReceiving = false;
-
-    //// Wait for the IPC-processing thread to finish
-    //if (s.joinable()){
-    //    s.join();
-    //    OutputDebugString(L"[.] Exiting application\n");
-    //}
-
+    // Signal termination to IPCClient
+    isIPC = false;
+    t.join();
 
     return DXUTGetExitCode();
 }
