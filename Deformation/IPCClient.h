@@ -22,13 +22,13 @@
 
 #define BUFSIZE 512
 
-extern HANDLE hPipe;                // pipe handle
+extern HANDLE hPipe_comm;           // pipe handle
+extern HANDLE hPipe_quit;           // pipe handle
 extern bool isIPC;                  // IPC status
 extern std::vector<Deformable> deformableObjects;
 
-void IPCPipeClient();               // open named pipe
+void IPCPipeClient(const wchar_t*); // open named pipe
 void IPCProcessMessages();          // IPC-client message processor function
 wstuple ProcessCommand(byte*, int); // message processor
-
 
 #endif

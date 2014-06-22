@@ -175,14 +175,16 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     DXUTCreateDevice(D3D_FEATURE_LEVEL_11_0, true, 800, 600);
 
     // IPCClient start
-    std::thread t(IPCPipeClient);
+    std::thread t(IPCPipeClient, L"\\\\.\\pipe\\deformable_comm");      // command channel
+    t.detach();
 
     // Enter into the DXUT render loop
     DXUTMainLoop();
 
     // Signal termination to IPCClient
     isIPC = false;
-    t.join();
+    if (t.joinable())
+        t.join();
 
     return DXUTGetExitCode();
 }
@@ -406,6 +408,10 @@ LRESULT CALLBACK MsgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, boo
     }
     else if (uMsg == WM_SETFOCUS){
         isFocused = true;
+    }
+    else if (uMsg == WM_CLOSE)
+    {
+        isIPC = false;
     }
 
     // Pass all windows messages to camera so it can respond to user input

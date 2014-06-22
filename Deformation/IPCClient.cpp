@@ -11,7 +11,7 @@
 
 #include "IPCClient.h"
 
-HANDLE hPipe = INVALID_HANDLE_VALUE;
+HANDLE hPipe_comm = INVALID_HANDLE_VALUE;
 wchar_t chBuf[BUFSIZE];
 bool isIPC = true;
 
@@ -19,12 +19,9 @@ bool isIPC = true;
 //--------------------------------------------------------------------------------------
 // IPCOpenPipe: Connect to named pipe
 //--------------------------------------------------------------------------------------
-void IPCPipeClient(){
+void IPCPipeClient(const wchar_t* pipeName){
 
     /// variables
-    bool fSuccess = false;
-    DWORD cbRead, cbToWrite, cbWritten;
-    const wchar_t* pipeName = L"\\\\.\\pipe\\deformablepipe";
     std::wstring out = L"";
 
     /// open named pipe
@@ -33,14 +30,18 @@ void IPCPipeClient(){
         // check if still running
         if (!isIPC) return;
 
-        hPipe = CreateFile(pipeName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-        // pipe opened
-        if (hPipe != INVALID_HANDLE_VALUE)
+        hPipe_comm = CreateFile(pipeName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+
+        // pipe open
+        if (hPipe_comm != INVALID_HANDLE_VALUE){
+            out = L"[.] PipeClient: connected\n";
+            OutputDebugString(out.c_str());
             break;
+        }
     }
 
     /// pipe connected; change to byte-read mode
-    if (!SetNamedPipeHandleState(hPipe, PIPE_READMODE_BYTE, nullptr, nullptr))
+    if (!SetNamedPipeHandleState(hPipe_comm, PIPE_READMODE_BYTE, nullptr, nullptr))
     {
         out = L"\n[.] PipeClient: SetNamedPipeHandleState failed\n";
         OutputDebugString(out.c_str());
@@ -49,7 +50,7 @@ void IPCPipeClient(){
 
     IPCProcessMessages();
 
-    out = L"[.] PipeClient exiting\n";
+    out = L"[.] PipeClient: exiting\n";
     OutputDebugString(out.c_str());
 
     return;
@@ -65,12 +66,11 @@ void IPCProcessMessages()
     wchar_t* pchReply = (wchar_t*)HeapAlloc(hHeap, 0, BUFSIZE * sizeof(wchar_t));
     std::wstring out = L"";
 
-    DWORD cbBytesRead = 0, cbReplyBytes = 0, cbWritten = 0;
+    DWORD cbBytesRead = 0, cbWritten = 0;
     bool fSuccess = false;
-    HANDLE hlPipe = nullptr;
 
     /// error checking
-    if (pchRequest == nullptr || pchReply == nullptr || hPipe == nullptr)
+    if (pchRequest == nullptr || pchReply == nullptr || hPipe_comm == nullptr)
     {
         out = L"[!] PipeClient: memory allocation error\n";
         OutputDebugString(out.c_str());
@@ -83,11 +83,11 @@ void IPCProcessMessages()
     // buffer reading cycle
     while (isIPC)
     {
-        fSuccess = ReadFile(hlPipe, pchRequest, BUFSIZE * sizeof(wchar_t), &cbBytesRead, nullptr);
+        fSuccess = ReadFile(hPipe_comm, pchRequest, BUFSIZE * sizeof(wchar_t), &cbBytesRead, nullptr);
         if (!fSuccess || cbBytesRead == 0)
         {
             if (GetLastError() == ERROR_BROKEN_PIPE){
-                out = L"[.] PipeClient: client disconnected\n";
+                out = L"[.] PipeClient: server disconnected\n";
                 OutputDebugString(out.c_str());
             }
             else{
@@ -102,10 +102,10 @@ void IPCProcessMessages()
         std::wstring req = std::get<0>(tmp);
         std::wstring rep = std::get<1>(tmp);
         const wchar_t* reply = rep.c_str();
-        int replyBytes = rep.size()*sizeof(wchar_t);
+        DWORD replyBytes = rep.size() * sizeof(wchar_t);
 
         // write the reply to the pipe
-        fSuccess = WriteFile(hlPipe, reply, replyBytes, &cbWritten, nullptr);
+        fSuccess = WriteFile(hPipe_comm, reply, replyBytes, &cbWritten, nullptr);
         if (!fSuccess || replyBytes != cbWritten)
         {
             out = L"[!] PipeClient: writing error\n";
@@ -117,9 +117,8 @@ void IPCProcessMessages()
         OutputDebugString(out.c_str());
     }
 
-    FlushFileBuffers(hlPipe);
-    DisconnectNamedPipe(hlPipe);
-    CloseHandle(hlPipe);
+    FlushFileBuffers(hPipe_comm);
+    CloseHandle(hPipe_comm);
 
     HeapFree(hHeap, 0, pchRequest);
     HeapFree(hHeap, 0, pchReply);
@@ -143,7 +142,7 @@ wstuple ProcessCommand(byte* buf, int validBytes){
     /// Process command...
     std::string type, param;
     float valueX = 0.0f, valueY = 0.0f, valueZ = 0.0f;
-    int num = 0;
+    unsigned int num = 0;
     std::stringstream x(std::string(request.begin(), request.end()));
 
     x >> type;                                          // get command type
