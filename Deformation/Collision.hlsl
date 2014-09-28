@@ -63,16 +63,17 @@ void BVHUpdate(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 G
                 bvhdata[offset + leveloffset + i].max_y = max(ml.newpos.z, mr.newpos.z) + collision_range;
             }
         }
+
         // upper in the tree, update from two children
         else {
             // For every node on the current level, get min and max from left and right children
             for (uint i = 0; i < leveloffset + 1; i++){
-                bvhdata[offset + leveloffset + i].min_x = min(bvhdata[2 * (offset + leveloffset + i) + 1].min_x, bvhdata[2 * (offset + leveloffset + i) + 2].min_x);
-                bvhdata[offset + leveloffset + i].max_x = max(bvhdata[2 * (offset + leveloffset + i) + 1].max_x, bvhdata[2 * (offset + leveloffset + i) + 2].max_x);
-                bvhdata[offset + leveloffset + i].min_y = min(bvhdata[2 * (offset + leveloffset + i) + 1].min_y, bvhdata[2 * (offset + leveloffset + i) + 2].min_y);
-                bvhdata[offset + leveloffset + i].max_y = max(bvhdata[2 * (offset + leveloffset + i) + 1].max_y, bvhdata[2 * (offset + leveloffset + i) + 2].max_y);
-                bvhdata[offset + leveloffset + i].min_z = min(bvhdata[2 * (offset + leveloffset + i) + 1].min_z, bvhdata[2 * (offset + leveloffset + i) + 2].min_z);
-                bvhdata[offset + leveloffset + i].max_z = max(bvhdata[2 * (offset + leveloffset + i) + 1].max_z, bvhdata[2 * (offset + leveloffset + i) + 2].max_z);
+                bvhdata[offset + leveloffset + i].max_x = max(bvhdata[offset + 2 * (leveloffset + i) + 1].max_x, bvhdata[offset + 2 * (leveloffset + i) + 2].max_x);
+                bvhdata[offset + leveloffset + i].min_x = min(bvhdata[offset + 2 * (leveloffset + i) + 1].min_x, bvhdata[offset + 2 * (leveloffset + i) + 2].min_x);
+                bvhdata[offset + leveloffset + i].min_y = min(bvhdata[offset + 2 * (leveloffset + i) + 1].min_y, bvhdata[offset + 2 * (leveloffset + i) + 2].min_y);
+                bvhdata[offset + leveloffset + i].max_y = max(bvhdata[offset + 2 * (leveloffset + i) + 1].max_y, bvhdata[offset + 2 * (leveloffset + i) + 2].max_y);
+                bvhdata[offset + leveloffset + i].min_z = min(bvhdata[offset + 2 * (leveloffset + i) + 1].min_z, bvhdata[offset + 2 * (leveloffset + i) + 2].min_z);
+                bvhdata[offset + leveloffset + i].max_z = max(bvhdata[offset + 2 * (leveloffset + i) + 1].max_z, bvhdata[offset + 2 * (leveloffset + i) + 2].max_z);
             }
         }
 

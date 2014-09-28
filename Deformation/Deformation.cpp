@@ -174,17 +174,21 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     DXUTCreateWindow(L"Project Deformation");
     DXUTCreateDevice(D3D_FEATURE_LEVEL_11_0, true, 800, 600);
 
+#if IPCENABLED == 1
     // IPCClient start
     std::thread t(IPCPipeClient, L"\\\\.\\pipe\\deformable_comm");      // command channel
     t.detach();
+#endif
 
     // Enter into the DXUT render loop
     DXUTMainLoop();
 
+#if IPCENABLED == 1
     // Signal termination to IPCClient
     isIPC = false;
     if (t.joinable())
         t.join();
+#endif
 
     return DXUTGetExitCode();
 }
@@ -330,7 +334,8 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
         ID3D11UnorderedAccessView* bvhUAViews[2] = { bvhCatalogueUAV2, bvhDataUAV2 };
         pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, bvhUAViews, (UINT*)(&bvhUAViews));
 
-        //***pd3dImmediateContext->Dispatch(objectCount, 1, 1);
+        //*** JÓ, TESZTELNI AZ ADATOKAT
+        pd3dImmediateContext->Dispatch(objectCount, 1, 1);
 
         ID3D11ShaderResourceView* bvhSRViewNULL[4] = { nullptr, nullptr, nullptr, nullptr };
         pd3dImmediateContext->CSSetShaderResources(0, 4, bvhSRViewNULL);
@@ -731,7 +736,6 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
         }
     }
 
-
     /// Create buffers
 
     // Desc for Particle buffers
@@ -940,7 +944,6 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     V_RETURN(pd3dDevice->CreateUnorderedAccessView(bvhDataBuffer2, &bddescUAV, &bvhDataUAV2));
     DXUT_SetDebugName(bvhDataUAV1, "BVHData UAV1");
     DXUT_SetDebugName(bvhDataUAV2, "BVHData UAV2");
-
 
     return hr;
 }

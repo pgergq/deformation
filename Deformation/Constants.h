@@ -25,6 +25,9 @@ using namespace DirectX;
 #define GET_X_LPARAM(lp)        ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp)        ((int)(short)HIWORD(lp))
 
+// enable DeformationConsole communication
+#define IPCENABLED              0
+
 
 // DEFORMATION defines
 #define VCUBEWIDTH              13          // n*n*n inner cube, (n+1)*(n+1)*(n+1) outer cube
