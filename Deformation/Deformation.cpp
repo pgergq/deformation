@@ -281,11 +281,12 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
         pd3dImmediateContext->CSSetConstantBuffers(0, 1, ppCB);
 
         // Run first CS (first volcube)
-        pd3dImmediateContext->Dispatch(VCUBEWIDTH, VCUBEWIDTH, VCUBEWIDTH * objectCount);
+        //pd3dImmediateContext->Dispatch(VCUBEWIDTH, VCUBEWIDTH, VCUBEWIDTH * objectCount); // unoptimized method
+        pd3dImmediateContext->Dispatch(ceil(VCUBEWIDTH*VCUBEWIDTH*VCUBEWIDTH*objectCount/MASSPOINT_TGSIZE), 1, 1);  // optimized dispatch
 
         // Run second CS (second volcube)
         pd3dImmediateContext->CSSetShader(physicsCS2, nullptr, 0);
-        pd3dImmediateContext->Dispatch((VCUBEWIDTH + 1), (VCUBEWIDTH + 1), (VCUBEWIDTH + 1) * objectCount);
+        pd3dImmediateContext->Dispatch(ceil((VCUBEWIDTH + 1)*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1)*objectCount / MASSPOINT_TGSIZE), 1, 1);  // optimized dispatch
 
         // Unbind resources for CS
         ID3D11ShaderResourceView* srvnull[4] = { nullptr, nullptr, nullptr, nullptr };
@@ -312,7 +313,8 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
         ID3D11UnorderedAccessView* uaUAViews[3] = { particleUAV2, masscube1UAV1, masscube2UAV1 };
         pd3dImmediateContext->CSSetUnorderedAccessViews(0, 3, uaUAViews, (UINT*)(&uaUAViews));
 
-        pd3dImmediateContext->Dispatch(particleCount, 1, 1);
+        /// unoptimized method: pd3dImmediateContext->Dispatch(particleCount, 1, 1);
+        pd3dImmediateContext->Dispatch(ceil(particleCount / PARTICLE_TGSIZE), 1, 1);
 
         ID3D11UnorderedAccessView* uppUAViewNULL[3] = { nullptr, nullptr, nullptr };
         pd3dImmediateContext->CSSetUnorderedAccessViews(0, 3, uppUAViewNULL, (UINT*)(&uaUAViews));
@@ -335,7 +337,7 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
         pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, bvhUAViews, (UINT*)(&bvhUAViews));
 
         //*** JÓ, TESZTELNI AZ ADATOKAT
-        pd3dImmediateContext->Dispatch(objectCount, 1, 1);
+        //pd3dImmediateContext->Dispatch(objectCount, 1, 1);
 
         ID3D11ShaderResourceView* bvhSRViewNULL[4] = { nullptr, nullptr, nullptr, nullptr };
         pd3dImmediateContext->CSSetShaderResources(0, 4, bvhSRViewNULL);

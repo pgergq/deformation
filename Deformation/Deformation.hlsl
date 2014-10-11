@@ -8,26 +8,6 @@
 //--------------------------------------------------------------------------------------
 
 
-// volcube neighbouring data
-#define NB_SAME_LEFT			0x20
-#define NB_SAME_RIGHT			0x10
-#define NB_SAME_DOWN			0x08
-#define NB_SAME_UP				0x04
-#define NB_SAME_FRONT			0x02
-#define NB_SAME_BACK			0x01
-#define NB_OTHER_NEAR_BOT_LEFT	0x80
-#define NB_OTHER_NEAR_BOT_RIGHT	0x40
-#define NB_OTHER_NEAR_TOP_LEFT	0x20
-#define NB_OTHER_NEAR_TOP_RIGHT	0x10
-#define NB_OTHER_FAR_BOT_LEFT	0x08
-#define NB_OTHER_FAR_BOT_RIGHT	0x04
-#define NB_OTHER_FAR_TOP_LEFT	0x02
-#define NB_OTHER_FAR_TOP_RIGHT	0x01
-
-// constants
-#define exp_mul					0.05f		// default: 0.05f
-#define exp_max					1000000		// default: 1000000
-
 // include structure definitions
 #include "Structures.hlsl"
 
@@ -72,40 +52,44 @@ uint index_2(uint x, uint y, uint z){
 
 
 
-[numthreads(1, 1, 1)]
+[numthreads(masspoint_tgsize, 1, 1)]
 void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint GI : SV_GroupIndex)
 {
 
     /// Helper variables
-    uint full = Gid.z*cube_width*cube_width + Gid.y*cube_width + Gid.x;
+    //uint full = Gid.z*cube_width*cube_width + Gid.y*cube_width + Gid.x; // old call
+    uint full = DTid.x;
     uint objnum = full / (cube_width*cube_width*cube_width);    // object masscube's line number in masscube buffer
     uint cube = full % (cube_width*cube_width*cube_width);      // masspoint index in cube
     uint z = cube / cube_width / cube_width;                  // cube z coord
     uint y = (cube - z*cube_width*cube_width) / cube_width;      // cube y coord
     uint x = (cube - z*cube_width*cube_width - y*cube_width);    // cube x coord
-    // full indeces in first and second masscube buffer
+
+    // full indices in first and second masscube buffer
     uint ind = objnum*cube_width*cube_width*cube_width + z*cube_width*cube_width + y*cube_width + x;
     uint ind2 = objnum*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + z*(cube_width + 1)*(cube_width + 1) + y*(cube_width + 1) + x;
     
+    // old masspoint data
+    MassPoint old = ovolcube1[ind];
 
 	/// Picking
 	float4 pickID = vertexID1[uint2(pick_origin_x, pick_origin_y)];				// ID of picked masscube's lower left masspoint
 
 	// if picking mode is on AND the pick didn't happen over a black pixel AND the picked vertex is adjacent to the current masspoint
 	if (is_picking && pickID.w != 0 && (x == pickID.x && y == pickID.y && (z+objnum*cube_width) == pickID.z)){
-		float len = length(ovolcube1[ind].newpos.xyz - eye_pos.xyz);			// current
+		float len = length(old.newpos.xyz - eye_pos.xyz);			// current
 		float3 v_curr = pick_dir.xyz * len + eye_pos.xyz;							// current position
 
 		volcube1[ind].acc.xyz = float3(0, 0, 0);
-		volcube1[ind].oldpos = ovolcube1[ind].newpos;
+		volcube1[ind].oldpos = old.newpos;
 		volcube1[ind].newpos.xyz = v_curr;
 	}
 
     /// Normal mode
 	else {
 
-		uint same = ovolcube1[ind].neighbour_same;
-		uint other = ovolcube1[ind].neighbour_other;
+		uint same = old.neighbour_same;
+		uint other = old.neighbour_other;
 		int notstaticmass = (same | other) == 0 ? 0 : 1;	//0 = static masspoint, no neighbours
 
 		/// Sum neighbouring forces
@@ -114,99 +98,114 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 		// Get neighbours, set acceleration, with index checking
 		// neighbours in the same volcube + second neighbours
 		if (same & NB_SAME_LEFT){				// left neighbour
-			accel += acceleration(ovolcube1[ind], ovolcube1[ind - 1], 0);
+			accel += acceleration(old, ovolcube1[ind - 1], 0);
 			if (x > 1 && (ovolcube1[ind - 1].neighbour_same & NB_SAME_LEFT))				//second to left
-				accel += acceleration(ovolcube1[ind], ovolcube1[ind - 2], 2);
+				accel += acceleration(old, ovolcube1[ind - 2], 2);
 		}
 		if (same & NB_SAME_RIGHT){				// right neighbour 
-			accel += acceleration(ovolcube1[ind], ovolcube1[ind + 1], 0);
+            accel += acceleration(old, ovolcube1[ind + 1], 0);
 			if (x < cube_width - 2 && (ovolcube1[ind + 1].neighbour_same & NB_SAME_RIGHT))		//second to right
-				accel += acceleration(ovolcube1[ind], ovolcube1[ind + 2], 2);
+                accel += acceleration(old, ovolcube1[ind + 2], 2);
 		}
 		if (same & NB_SAME_DOWN){				// lower neighbour
-			accel += acceleration(ovolcube1[ind], ovolcube1[ind - cube_width], 0);
+            accel += acceleration(old, ovolcube1[ind - cube_width], 0);
 			if (y > 1 && (ovolcube1[ind - cube_width].neighbour_same & NB_SAME_DOWN))			//second down
-				accel += acceleration(ovolcube1[ind], ovolcube1[ind - 2 * cube_width], 2);
+                accel += acceleration(old, ovolcube1[ind - 2 * cube_width], 2);
 		}
 		if (same & NB_SAME_UP){				// upper neighbour
-			accel += acceleration(ovolcube1[ind], ovolcube1[ind + cube_width], 0);
+            accel += acceleration(old, ovolcube1[ind + cube_width], 0);
 			if (y < cube_width - 2 && (ovolcube1[ind + cube_width].neighbour_same & NB_SAME_UP))	//second up
-				accel += acceleration(ovolcube1[ind], ovolcube1[ind + 2 * cube_width], 2);
+                accel += acceleration(old, ovolcube1[ind + 2 * cube_width], 2);
 		}
 		if (same & NB_SAME_FRONT){				// nearer neighbour
-			accel += acceleration(ovolcube1[ind], ovolcube1[ind - cube_width*cube_width], 0);
+            accel += acceleration(old, ovolcube1[ind - cube_width*cube_width], 0);
 			if (z > 1 && (ovolcube1[ind - cube_width*cube_width].neighbour_same & NB_SAME_FRONT))			//second front
-				accel += acceleration(ovolcube1[ind], ovolcube1[ind - 2 * cube_width * cube_width], 2);
+                accel += acceleration(old, ovolcube1[ind - 2 * cube_width * cube_width], 2);
 		}
 		if (same & NB_SAME_BACK){				// farther neighbour
-			accel += acceleration(ovolcube1[ind], ovolcube1[ind + cube_width*cube_width], 0);
+            accel += acceleration(old, ovolcube1[ind + cube_width*cube_width], 0);
 			if (z < cube_width - 2 && (ovolcube1[ind + cube_width*cube_width].neighbour_same & NB_SAME_BACK))	//second back
-				accel += acceleration(ovolcube1[ind], ovolcube1[ind + 2 * cube_width * cube_width], 2);
+                accel += acceleration(old, ovolcube1[ind + 2 * cube_width * cube_width], 2);
 		}
 
 		// neighbours in second volcube
 		if (other & NB_OTHER_NEAR_BOT_LEFT)
-			accel += acceleration(ovolcube1[ind], ovolcube2[ind2], 1);
+            accel += acceleration(old, ovolcube2[ind2], 1);
 		if (other & NB_OTHER_NEAR_BOT_RIGHT)
-			accel += acceleration(ovolcube1[ind], ovolcube2[ind2 + 1], 1);
+            accel += acceleration(old, ovolcube2[ind2 + 1], 1);
 		if (other & NB_OTHER_NEAR_TOP_LEFT)
-			accel += acceleration(ovolcube1[ind], ovolcube2[ind2 + cube_width + 1], 1);
+            accel += acceleration(old, ovolcube2[ind2 + cube_width + 1], 1);
 		if (other & NB_OTHER_NEAR_TOP_RIGHT)
-			accel += acceleration(ovolcube1[ind], ovolcube2[ind2 + cube_width + 2], 1);
+            accel += acceleration(old, ovolcube2[ind2 + cube_width + 2], 1);
 		if (other & NB_OTHER_FAR_BOT_LEFT)
-			accel += acceleration(ovolcube1[ind], ovolcube2[ind2 + (cube_width + 1)*(cube_width + 1)], 1);
+            accel += acceleration(old, ovolcube2[ind2 + (cube_width + 1)*(cube_width + 1)], 1);
 		if (other & NB_OTHER_FAR_BOT_RIGHT)
-			accel += acceleration(ovolcube1[ind], ovolcube2[ind2 + (cube_width + 1)*(cube_width + 1) + 1], 1);
+            accel += acceleration(old, ovolcube2[ind2 + (cube_width + 1)*(cube_width + 1) + 1], 1);
 		if (other & NB_OTHER_FAR_TOP_LEFT)
-			accel += acceleration(ovolcube1[ind], ovolcube2[ind2 + (cube_width + 1)*(cube_width + 1) + cube_width + 1], 1);
+            accel += acceleration(old, ovolcube2[ind2 + (cube_width + 1)*(cube_width + 1) + cube_width + 1], 1);
 		if (other & NB_OTHER_FAR_TOP_RIGHT)
-			accel += acceleration(ovolcube1[ind], ovolcube2[ind2 + (cube_width + 1)*(cube_width + 1) + cube_width + 2], 1);
+            accel += acceleration(old, ovolcube2[ind2 + (cube_width + 1)*(cube_width + 1) + cube_width + 2], 1);
+
+        
+        // Collision detection
 
 
-		//Verlet + Acceleration
-		if (ovolcube1[ind].newpos.y < table_pos && notstaticmass){				// table
-			accel += float3(0, min(exp_max, 1000 * exp2(-ovolcube1[ind].newpos.y)*exp_mul), 0);
+
+
+
+
+
+
+        //////////////////////
+
+		// Verlet + Acceleration
+        if (old.newpos.y < table_pos && notstaticmass){				// table
+            accel += float3(0, min(exp_max, 1000 * exp2(-old.newpos.y)*exp_mul), 0);
 		}
 		volcube1[ind].acc.xyz = accel;
-		volcube1[ind].oldpos = ovolcube1[ind].newpos;
-		volcube1[ind].newpos.xyz = ovolcube1[ind].newpos.xyz * 2 - ovolcube1[ind].oldpos.xyz + accel*dt*dt;
+        volcube1[ind].oldpos = old.newpos;
+        volcube1[ind].newpos.xyz = old.newpos.xyz * 2 - old.oldpos.xyz + accel*dt*dt;
 	}
 }
 
-[numthreads(1, 1, 1)]
+[numthreads(masspoint_tgsize, 1, 1)]
 void CSMain2(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID, uint GI : SV_GroupIndex)
 {
 
     /// Helper variables
-    uint full = Gid.z*(cube_width + 1)*(cube_width + 1) + Gid.y*(cube_width + 1) + Gid.x;
+    //uint full = Gid.z*(cube_width + 1)*(cube_width + 1) + Gid.y*(cube_width + 1) + Gid.x; // old call
+    uint full = DTid.x;
     uint objnum = full / ((cube_width + 1)*(cube_width + 1)*(cube_width + 1));       // object masscube's line number in masscube buffer
     uint cube = full % ((cube_width + 1)*(cube_width + 1)*(cube_width + 1));         // masspoint index in cube
     uint z = cube / (cube_width + 1) / (cube_width + 1);                          // cube z coord
     uint y = (cube - z*(cube_width + 1)*(cube_width + 1)) / (cube_width + 1);        // cube y coord
     uint x = (cube - z*(cube_width + 1)*(cube_width + 1) - y*(cube_width + 1));      // cube x coord
-    // full indeces in first and second masscube buffer
+
+    // full indices in first and second masscube buffer
     uint ind = objnum*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + z*(cube_width + 1)*(cube_width + 1) + y*(cube_width + 1) + x;
     uint ind1 = objnum*cube_width*cube_width*cube_width + z*cube_width*cube_width + y*cube_width + x;
 
+    // old masspoint
+    MassPoint old = ovolcube2[ind];
 
 	/// Picking
 	float4 pickID = vertexID2[uint2(pick_origin_x, pick_origin_y)];				    // ID of picked masscube's lower left masspoint
 
 	// if picking mode is on AND the pick didn't happen over a black pixel AND the picked vertex is adjacent to the current masspoint
     if (is_picking && pickID.w != 0 && (x == pickID.x && y == pickID.y && (z + objnum*(cube_width + 1)) == pickID.z)){
-		float len = length(ovolcube2[ind].newpos.xyz - eye_pos.xyz);			// current 
+        float len = length(old.newpos.xyz - eye_pos.xyz);			// current 
 		float3 v_curr = pick_dir.xyz * len + eye_pos.xyz;							// current position
 
 		volcube2[ind].acc.xyz = float3(0, 0, 0);
-		volcube2[ind].oldpos = ovolcube2[ind].newpos;
+        volcube2[ind].oldpos = old.newpos;
 		volcube2[ind].newpos.xyz = v_curr;
 	}
 
     /// Normal mode
 	else {
 
-		uint same = ovolcube2[ind].neighbour_same;
-		uint other = ovolcube2[ind].neighbour_other;
+        uint same = old.neighbour_same;
+        uint other = old.neighbour_other;
 		int notstaticmass = (same | other) == 0 ? 0 : 1;	//0 = static masspoint, no neighbours
 
 		/// Sum neighbouring forces
@@ -215,60 +214,72 @@ void CSMain2(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 		// Get neighbours, set acceleration, with index checking
 		// neighbours in the same volcube + second neighbours
 		if (same & NB_SAME_LEFT){				// left neighbour
-			accel += acceleration(ovolcube2[ind], ovolcube2[ind - 1], 0);
+            accel += acceleration(old, ovolcube2[ind - 1], 0);
 			if (x > 1 && (ovolcube2[ind - 1].neighbour_same & NB_SAME_LEFT))				//second to left
-				accel += acceleration(ovolcube2[ind], ovolcube2[ind - 2], 2);
+                accel += acceleration(old, ovolcube2[ind - 2], 2);
 		}
 		if (same & NB_SAME_RIGHT){				// right neighbour 
-			accel += acceleration(ovolcube2[ind], ovolcube2[ind + 1], 0);
+            accel += acceleration(old, ovolcube2[ind + 1], 0);
 			if (x < cube_width - 1 && (ovolcube2[ind + 1].neighbour_same & NB_SAME_RIGHT))		//second to right
-				accel += acceleration(ovolcube2[ind], ovolcube2[ind + 2], 2);
+                accel += acceleration(old, ovolcube2[ind + 2], 2);
 		}
 		if (same & NB_SAME_DOWN){				// lower neighbour
-			accel += acceleration(ovolcube2[ind], ovolcube2[ind - cube_width - 1], 0);
+            accel += acceleration(old, ovolcube2[ind - cube_width - 1], 0);
 			if (y > 1 && (ovolcube2[ind - (cube_width + 1)].neighbour_same & NB_SAME_DOWN))	    //second down
-				accel += acceleration(ovolcube2[ind], ovolcube2[ind - 2 * (cube_width + 1)], 2);
+                accel += acceleration(old, ovolcube2[ind - 2 * (cube_width + 1)], 2);
 		}
 		if (same & NB_SAME_UP){					// upper neighbour
-			accel += acceleration(ovolcube2[ind], ovolcube2[ind + cube_width + 1], 0);
+            accel += acceleration(old, ovolcube2[ind + cube_width + 1], 0);
 			if (y < cube_width - 1 && (ovolcube2[ind + cube_width + 1].neighbour_same & NB_SAME_UP))	//second up
-				accel += acceleration(ovolcube2[ind], ovolcube2[ind + 2 * (cube_width + 1)], 2);
+                accel += acceleration(old, ovolcube2[ind + 2 * (cube_width + 1)], 2);
 		}
 		if (same & NB_SAME_FRONT){				// nearer neighbour
-			accel += acceleration(ovolcube2[ind], ovolcube2[ind - (cube_width + 1)*(cube_width + 1)], 0);
+            accel += acceleration(old, ovolcube2[ind - (cube_width + 1)*(cube_width + 1)], 0);
 			if (z > 1 && (ovolcube2[ind - (cube_width + 1)*(cube_width + 1)].neighbour_same & NB_SAME_FRONT))				//second front
-				accel += acceleration(ovolcube2[ind], ovolcube2[ind - 2 * (cube_width + 1) * (cube_width + 1)], 2);
+                accel += acceleration(old, ovolcube2[ind - 2 * (cube_width + 1) * (cube_width + 1)], 2);
 		}
 		if (same & NB_SAME_BACK){				// farther neighbour
-			accel += acceleration(ovolcube2[ind], ovolcube2[ind + (cube_width + 1)*(cube_width + 1)], 0);
+            accel += acceleration(old, ovolcube2[ind + (cube_width + 1)*(cube_width + 1)], 0);
 			if (z < cube_width - 1 && (ovolcube2[ind + (cube_width + 1)*(cube_width + 1)].neighbour_same & NB_SAME_BACK))	//second back
-				accel += acceleration(ovolcube2[ind], ovolcube2[ind + 2 * (cube_width + 1) * (cube_width + 1)], 2);
+                accel += acceleration(old, ovolcube2[ind + 2 * (cube_width + 1) * (cube_width + 1)], 2);
 		}
 
 		// neighbours in second volcube
 		if (other & NB_OTHER_NEAR_BOT_LEFT)	// front, bottomleft
-			accel += acceleration(ovolcube2[ind], ovolcube1[ind1 - cube_width*cube_width - cube_width - 1], 1);
+            accel += acceleration(old, ovolcube1[ind1 - cube_width*cube_width - cube_width - 1], 1);
 		if (other & NB_OTHER_NEAR_BOT_RIGHT)	// front, bottomright
-			accel += acceleration(ovolcube2[ind], ovolcube1[ind1 - cube_width*cube_width - cube_width], 1);
+            accel += acceleration(old, ovolcube1[ind1 - cube_width*cube_width - cube_width], 1);
 		if (other & NB_OTHER_NEAR_TOP_LEFT)	// front, topleft
-			accel += acceleration(ovolcube2[ind], ovolcube1[ind1 - cube_width*cube_width - 1], 1);
+            accel += acceleration(old, ovolcube1[ind1 - cube_width*cube_width - 1], 1);
 		if (other & NB_OTHER_NEAR_TOP_RIGHT)	// front, topright
-			accel += acceleration(ovolcube2[ind], ovolcube1[ind1 - cube_width*cube_width], 1);
+            accel += acceleration(old, ovolcube1[ind1 - cube_width*cube_width], 1);
 		if (other & NB_OTHER_FAR_BOT_LEFT)		// back, bottomleft
-			accel += acceleration(ovolcube2[ind], ovolcube1[ind1 - cube_width - 1], 1);
+            accel += acceleration(old, ovolcube1[ind1 - cube_width - 1], 1);
 		if (other & NB_OTHER_FAR_BOT_RIGHT)	// back, bottomright
-			accel += acceleration(ovolcube2[ind], ovolcube1[ind1 - cube_width], 1);
+            accel += acceleration(old, ovolcube1[ind1 - cube_width], 1);
 		if (other & NB_OTHER_FAR_TOP_LEFT)		// back, topleft
-			accel += acceleration(ovolcube2[ind], ovolcube1[ind1 - 1], 1);
+            accel += acceleration(old, ovolcube1[ind1 - 1], 1);
 		if (other & NB_OTHER_FAR_TOP_RIGHT)	// back, topright
-			accel += acceleration(ovolcube2[ind], ovolcube1[ind1], 1);
+            accel += acceleration(old, ovolcube1[ind1], 1);
 
-		//Verlet + Acceleration
-		if (ovolcube2[ind].newpos.y < table_pos && notstaticmass){  // table
-			accel += float3(0, min(exp_max, 1000 * exp2(-ovolcube2[ind].newpos.y)*exp_mul), 0);
+
+        // Collision detection
+
+
+
+
+
+
+
+
+        //////////////////////
+
+		// Verlet + Acceleration
+        if (old.newpos.y < table_pos && notstaticmass){  // table
+            accel += float3(0, min(exp_max, 1000 * exp2(-old.newpos.y)*exp_mul), 0);
 		}
 		volcube2[ind].acc.xyz = accel;
-		volcube2[ind].oldpos = ovolcube2[ind].newpos;
-		volcube2[ind].newpos.xyz = ovolcube2[ind].newpos.xyz * 2 - ovolcube2[ind].oldpos.xyz + accel*dt*dt;
+        volcube2[ind].oldpos = old.newpos;
+        volcube2[ind].newpos.xyz = old.newpos.xyz * 2 - old.oldpos.xyz + accel*dt*dt;
 	}
 }

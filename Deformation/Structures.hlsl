@@ -7,6 +7,28 @@
 //--------------------------------------------------------------------------------------
 
 
+// volcube neighbouring data
+#define NB_SAME_LEFT			0x20
+#define NB_SAME_RIGHT			0x10
+#define NB_SAME_DOWN			0x08
+#define NB_SAME_UP				0x04
+#define NB_SAME_FRONT			0x02
+#define NB_SAME_BACK			0x01
+#define NB_OTHER_NEAR_BOT_LEFT	0x80
+#define NB_OTHER_NEAR_BOT_RIGHT	0x40
+#define NB_OTHER_NEAR_TOP_LEFT	0x20
+#define NB_OTHER_NEAR_TOP_RIGHT	0x10
+#define NB_OTHER_FAR_BOT_LEFT	0x08
+#define NB_OTHER_FAR_BOT_RIGHT	0x04
+#define NB_OTHER_FAR_TOP_LEFT	0x02
+#define NB_OTHER_FAR_TOP_RIGHT	0x01
+
+// constants
+#define exp_mul					0.05f		// default: 0.05f
+#define exp_max					1000000		// default: 1000000
+#define masspoint_tgsize        256
+#define particle_tgsize         256
+
 // constant buffer for compute shaders
 cbuffer cbCS : register(b0)
 {

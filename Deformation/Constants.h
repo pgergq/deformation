@@ -31,6 +31,8 @@ using namespace DirectX;
 
 // DEFORMATION defines
 #define VCUBEWIDTH              13          // n*n*n inner cube, (n+1)*(n+1)*(n+1) outer cube
+#define PARTICLE_TGSIZE         256         // particle update CS threadgroup size
+#define MASSPOINT_TGSIZE        256         // masspoint update CS threadgroup size
 
 // volcube neighbouring data
 #define NB_SAME_LEFT            0x20        // 0010 0000, has left neighbour
