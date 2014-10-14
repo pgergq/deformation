@@ -16,6 +16,8 @@ StructuredBuffer<MassPoint> ovolcube1	: register(t0);
 StructuredBuffer<MassPoint> ovolcube2	: register(t1);
 Texture2D<float4> vertexID1				: register(t2);
 Texture2D<float4> vertexID2				: register(t3);
+StructuredBuffer<BVHDesc> bvhdesc       : register(t4);
+StructuredBuffer<BVBox> bvhdata         : register(t5);
 RWStructuredBuffer<MassPoint> volcube1	: register(u0);
 RWStructuredBuffer<MassPoint> volcube2	: register(u1);
 
@@ -50,6 +52,11 @@ uint index_2(uint x, uint y, uint z){
     return z*(cube_width + 1)*(cube_width + 1) + y*(cube_width + 1) + x;
 }
 
+// x is between a and b values
+bool between(float x, float a, float b){
+    return (a <= x) && (x <= b);
+}
+
 
 
 [numthreads(masspoint_tgsize, 1, 1)]
@@ -61,9 +68,9 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
     uint full = DTid.x;
     uint objnum = full / (cube_width*cube_width*cube_width);    // object masscube's line number in masscube buffer
     uint cube = full % (cube_width*cube_width*cube_width);      // masspoint index in cube
-    uint z = cube / cube_width / cube_width;                  // cube z coord
-    uint y = (cube - z*cube_width*cube_width) / cube_width;      // cube y coord
-    uint x = (cube - z*cube_width*cube_width - y*cube_width);    // cube x coord
+    uint z = cube / cube_width / cube_width;                    // cube z coord
+    uint y = (cube - z*cube_width*cube_width) / cube_width;     // cube y coord
+    uint x = (cube - z*cube_width*cube_width - y*cube_width);   // cube x coord
 
     // full indices in first and second masscube buffer
     uint ind = objnum*cube_width*cube_width*cube_width + z*cube_width*cube_width + y*cube_width + x;
@@ -76,7 +83,7 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 	float4 pickID = vertexID1[uint2(pick_origin_x, pick_origin_y)];				// ID of picked masscube's lower left masspoint
 
 	// if picking mode is on AND the pick didn't happen over a black pixel AND the picked vertex is adjacent to the current masspoint
-	if (is_picking && pickID.w != 0 && (x == pickID.x && y == pickID.y && (z+objnum*cube_width) == pickID.z)){
+	if (is_picking && pickID.w != 0 && (x == pickID.x && y == pickID.y && (z + objnum * cube_width) == pickID.z)){
 		float len = length(old.newpos.xyz - eye_pos.xyz);			// current
 		float3 v_curr = pick_dir.xyz * len + eye_pos.xyz;							// current position
 
@@ -148,14 +155,64 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 
         
         // Collision detection
+        float4 cpos = old.newpos;                   // current masspoint position
+        for (uint o = 0; o < object_count; o++){    // for every object in the simulation
 
+            BVHDesc colldesc = bvhdesc[o];          // colliding? object's desc
+            
+            // o == objnum => self-collision
+            if (o == objnum){
+                // *TODO*
+            }
 
+            // collision with another object
+            else {
+                // do we have collision?
+                if (between(cpos.x, colldesc.min_x, colldesc.max_x) && between(cpos.y, colldesc.min_y, colldesc.max_y) && between(cpos.z, colldesc.min_z, colldesc.max_z)){
+                    
+                    // collision with the other object, compute forces (traverse tree)
+                    bool tree[2048];    // *TODO* ???
+                    tree[0] = tree[1] = tree[2] = true;
+                    uint maxlevel = log2(colldesc.masspoint_count + 1);
+                    for (uint i = 1; i < maxlevel; i++){                                    // i = level number, root level already checked (collision)
+                        uint leveloffset = exp2(i) - 1;                                     // first node index of current level
 
+                        for (uint j = leveloffset; j < leveloffset * 2 + 1; j++){           // j = node index int the whole tree (for every node on the current level)
+                            BVBox node = bvhdata[j];
+                            // not leaf level -> go below
+                            if (i != maxlevel - 1){
+                                // colliding parent box AND inside bounding box -> check children nodes
+                                // *TODO*: optimize axes
+                                if (tree[j] && between(cpos.x, node.min_x, node.max_x) && between(cpos.y, node.min_x, node.max_y) && between(cpos.z, node.min_z, node.max_z)){
+                                    tree[j * 2 + 1] = true;
+                                    tree[j * 2 + 2] = true;
+                                }
+                                else {
+                                    tree[j * 2 + 1] = false;
+                                    tree[j * 2 + 2] = false;
+                                }
+                            }
+                            // leaf level -> calculate force
+                            else {
+                                if (tree[j] && node.left_type != -1){                        // valid left leaf, calculate force
+                                    float4 xpos = (node.left_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.left_id].newpos 
+                                                                        : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.left_id].newpos;
+                                    float3 dir = normalize((cpos - xpos).xyz);
+                                    // *TODO*: may the Force here be calculated
 
-
-
-
-
+                                }
+                                if (tree[j] && node.right_type != -1){                       // valid right leaf, calculate force
+                                    float4 xpos = (node.right_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.right_id].newpos
+                                                                         : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.right_id].newpos;
+                                    float3 dir = normalize((cpos - xpos).xyz);
+                                    // *TODO*: may the Force here be calculated
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         //////////////////////
 
 		// Verlet + Acceleration

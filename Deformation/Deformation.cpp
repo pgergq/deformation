@@ -229,8 +229,8 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
         // EXECUTE FIRST COMPUTE SHADER: UPDATE VOLUMETRIC MODELS
         pd3dImmediateContext->CSSetShader(physicsCS1, nullptr, 0);
 
-        ID3D11ShaderResourceView* srvs[4] = { masscube1SRV2, masscube2SRV2, pickingSRV1, pickingSRV2 };
-        pd3dImmediateContext->CSSetShaderResources(0, 4, srvs);
+        ID3D11ShaderResourceView* srvs[6] = { masscube1SRV2, masscube2SRV2, pickingSRV1, pickingSRV2, bvhCatalogueSRV1, bvhDataSRV1 };
+        pd3dImmediateContext->CSSetShaderResources(0, 6, srvs);
 
         ID3D11UnorderedAccessView* aUAViews[2] = { masscube1UAV1, masscube2UAV1 };
         pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, aUAViews, (UINT*)(&aUAViews));
@@ -289,8 +289,8 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
         pd3dImmediateContext->Dispatch(ceil((VCUBEWIDTH + 1)*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1)*objectCount / MASSPOINT_TGSIZE), 1, 1);  // optimized dispatch
 
         // Unbind resources for CS
-        ID3D11ShaderResourceView* srvnull[4] = { nullptr, nullptr, nullptr, nullptr };
-        pd3dImmediateContext->CSSetShaderResources(0, 4, srvnull);
+        ID3D11ShaderResourceView* srvnull[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+        pd3dImmediateContext->CSSetShaderResources(0, 6, srvnull);
 
         ID3D11UnorderedAccessView* ppUAViewNULL[2] = { nullptr, nullptr };
         pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, ppUAViewNULL, (UINT*)(&aUAViews));
@@ -336,8 +336,7 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
         ID3D11UnorderedAccessView* bvhUAViews[2] = { bvhCatalogueUAV2, bvhDataUAV2 };
         pd3dImmediateContext->CSSetUnorderedAccessViews(0, 2, bvhUAViews, (UINT*)(&bvhUAViews));
 
-        //*** JÓ, TESZTELNI AZ ADATOKAT
-        //pd3dImmediateContext->Dispatch(objectCount, 1, 1);
+        pd3dImmediateContext->Dispatch(objectCount, 1, 1);
 
         ID3D11ShaderResourceView* bvhSRViewNULL[4] = { nullptr, nullptr, nullptr, nullptr };
         pd3dImmediateContext->CSSetShaderResources(0, 4, bvhSRViewNULL);

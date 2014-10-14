@@ -23,16 +23,18 @@ void BVHUpdate(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 G
 {
     /// Helper variables
     uint objnum = Gid.x;                                        // object line number
-    uint offset = obvhdesc[objnum].array_offset;                // offset in bvhdata array
+    uint offset = obvhdesc[objnum].array_offset;                // offset in bvhdata array, index of tree root in global array
     uint maxlevel = log2(obvhdesc[objnum].masspoint_count + 1); // num of tree levels
     uint level = maxlevel;
+    BVHDesc olddesc = bvhdesc[objnum];                          // old descriptor entry
+    BVBox olddata = bvhdata[offset];                            // old tree root entry
 
     /// Update tree data
     while (level > 0){
 
         uint leveloffset = exp2(level - 1) - 1;                 // leveloffset = 2^(level-1)-1, number of nodes higher in the tree
 
-        // nodes level, update BVBoxes
+        // leaf level, update BVBoxes
         if (level == maxlevel){
             // For every node on the current level, get min and max from masspoint data
             for (uint i = 0; i < leveloffset + 1; i++){
@@ -55,12 +57,14 @@ void BVHUpdate(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 G
                     mr = volcube2[objnum*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + tmp.right_id];
                 }
 
-                bvhdata[offset + leveloffset + i].min_x = min(ml.newpos.x, mr.newpos.x) - collision_range;
-                bvhdata[offset + leveloffset + i].max_x = max(ml.newpos.x, mr.newpos.x) + collision_range;
-                bvhdata[offset + leveloffset + i].min_y = min(ml.newpos.y, mr.newpos.y) - collision_range;
-                bvhdata[offset + leveloffset + i].max_y = max(ml.newpos.y, mr.newpos.y) + collision_range;
-                bvhdata[offset + leveloffset + i].min_y = min(ml.newpos.z, mr.newpos.z) - collision_range;
-                bvhdata[offset + leveloffset + i].max_y = max(ml.newpos.z, mr.newpos.z) + collision_range;
+                BVBox equ = { tmp.left_id, tmp.left_type, tmp.right_id, tmp.right_type,
+                              min(ml.newpos.x, mr.newpos.x) - collision_range,
+                              max(ml.newpos.x, mr.newpos.x) + collision_range,
+                              min(ml.newpos.y, mr.newpos.y) - collision_range,
+                              max(ml.newpos.y, mr.newpos.y) + collision_range,
+                              min(ml.newpos.z, mr.newpos.z) - collision_range,
+                              max(ml.newpos.z, mr.newpos.z) + collision_range };
+                bvhdata[offset + leveloffset + i] = equ;
             }
         }
 
@@ -68,12 +72,14 @@ void BVHUpdate(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 G
         else {
             // For every node on the current level, get min and max from left and right children
             for (uint i = 0; i < leveloffset + 1; i++){
-                bvhdata[offset + leveloffset + i].max_x = max(bvhdata[offset + 2 * (leveloffset + i) + 1].max_x, bvhdata[offset + 2 * (leveloffset + i) + 2].max_x);
-                bvhdata[offset + leveloffset + i].min_x = min(bvhdata[offset + 2 * (leveloffset + i) + 1].min_x, bvhdata[offset + 2 * (leveloffset + i) + 2].min_x);
-                bvhdata[offset + leveloffset + i].min_y = min(bvhdata[offset + 2 * (leveloffset + i) + 1].min_y, bvhdata[offset + 2 * (leveloffset + i) + 2].min_y);
-                bvhdata[offset + leveloffset + i].max_y = max(bvhdata[offset + 2 * (leveloffset + i) + 1].max_y, bvhdata[offset + 2 * (leveloffset + i) + 2].max_y);
-                bvhdata[offset + leveloffset + i].min_z = min(bvhdata[offset + 2 * (leveloffset + i) + 1].min_z, bvhdata[offset + 2 * (leveloffset + i) + 2].min_z);
-                bvhdata[offset + leveloffset + i].max_z = max(bvhdata[offset + 2 * (leveloffset + i) + 1].max_z, bvhdata[offset + 2 * (leveloffset + i) + 2].max_z);
+                BVBox tmp = bvhdata[offset + leveloffset + i];
+                BVBox a = bvhdata[offset + 2 * (leveloffset + i) + 1];
+                BVBox b = bvhdata[offset + 2 * (leveloffset + i) + 2];
+                BVBox equ = { tmp.left_id, tmp.left_type, tmp.right_id, tmp.right_type,     
+                              max(a.max_x, b.max_x), min(a.min_x, b.min_x),
+                              min(a.min_y, b.min_y), max(a.max_y, b.max_y),
+                              min(a.min_z, b.min_z), max(a.max_z, b.max_z) };
+                bvhdata[offset + leveloffset + i] = equ;
             }
         }
 
@@ -81,10 +87,8 @@ void BVHUpdate(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 G
     }
 
     /// Update catalogue
-    bvhdesc[objnum].min_x = bvhdata[offset].min_x;      // offset = index of tree root in global array
-    bvhdesc[objnum].max_x = bvhdata[offset].max_x;
-    bvhdesc[objnum].min_y = bvhdata[offset].min_y;
-    bvhdesc[objnum].max_y = bvhdata[offset].max_y;
-    bvhdesc[objnum].min_z = bvhdata[offset].min_z;
-    bvhdesc[objnum].max_z = bvhdata[offset].max_z;
+    BVHDesc eqv = { olddesc.array_offset, olddesc.masspoint_count, 
+                    olddata.min_x, olddata.max_x, olddata.min_y, 
+                    olddata.max_y, olddata.min_z, olddata.max_z };
+    bvhdesc[objnum] = eqv;
 }

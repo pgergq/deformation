@@ -141,7 +141,7 @@ BVBoxVector BVHierarchy::sort(MassIDTypeVector masspoints, uint mode){
 
         BVBOX tmp2;                                     // tmp <- bounding box for each masspoint in masspoints
 
-        if (x.size() != 0){                             // check for empty subtrees********
+        if (x.size() != 0){                             // (check for empty subtrees)
             tmp2.minX = (y.size() != 0 ? std::min(x[0].minX, y[0].minX) : x[0].minX);
             tmp2.maxX = (y.size() != 0 ? std::max(x[0].maxX, y[0].maxX) : x[0].maxX);
             tmp2.minY = (y.size() != 0 ? std::min(x[0].minY, y[0].minY) : x[0].minY);
@@ -151,7 +151,7 @@ BVBoxVector BVHierarchy::sort(MassIDTypeVector masspoints, uint mode){
         }
 
 
-        //if (!(x.size() == 0 && y.size() == 0)){             // only push if node has any children
+        //if (!(x.size() == 0 && y.size() == 0)){           // only push if node has any children
             xy.reserve(x.size() + y.size() + 1);
             xy = merge(x, y);                               // merge two children
             xy.insert(xy.begin(), tmp2);                    // vector[] <- {container, leftchildren, rightchildren}
