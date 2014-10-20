@@ -542,13 +542,13 @@ HRESULT importFiles(){
     //set up second bunny
     Deformable body2("bunny_res3_scaled.obj", 1);
     body2.build();
-    body2.translate(1000, 0, 0);
+    body2.translate(2000, 0, 0);
     deformableObjects.push_back(body2);
 
     //set up third bunny
     Deformable body3("bunny_res3_scaled.obj", 2);
     body3.build();
-    body3.translate(0, 2000, 0);
+    body3.translate(2000, 2000, 0);
     deformableObjects.push_back(body3);
 
     // Set variables
