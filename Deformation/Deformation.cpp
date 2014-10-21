@@ -281,12 +281,11 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
         pd3dImmediateContext->CSSetConstantBuffers(0, 1, ppCB);
 
         // Run first CS (first volcube)
-        //pd3dImmediateContext->Dispatch(VCUBEWIDTH, VCUBEWIDTH, VCUBEWIDTH * objectCount); // unoptimized method
-        pd3dImmediateContext->Dispatch(ceil(VCUBEWIDTH*VCUBEWIDTH*VCUBEWIDTH*objectCount/MASSPOINT_TGSIZE), 1, 1);  // optimized dispatch
+        pd3dImmediateContext->Dispatch(ceil((float)VCUBEWIDTH*VCUBEWIDTH*VCUBEWIDTH*objectCount / MASSPOINT_TGSIZE), 1, 1);  // optimized dispatch
 
         // Run second CS (second volcube)
         pd3dImmediateContext->CSSetShader(physicsCS2, nullptr, 0);
-        pd3dImmediateContext->Dispatch(ceil((VCUBEWIDTH + 1)*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1)*objectCount / MASSPOINT_TGSIZE), 1, 1);  // optimized dispatch
+        pd3dImmediateContext->Dispatch(ceil((float)(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1)*(VCUBEWIDTH + 1)*objectCount / MASSPOINT_TGSIZE), 1, 1);  // optimized dispatch
 
         // Unbind resources for CS
         ID3D11ShaderResourceView* srvnull[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
@@ -313,8 +312,7 @@ void CALLBACK OnFrameMove(double fTime, float fElapsedTime, void* pUserContext)
         ID3D11UnorderedAccessView* uaUAViews[3] = { particleUAV2, masscube1UAV1, masscube2UAV1 };
         pd3dImmediateContext->CSSetUnorderedAccessViews(0, 3, uaUAViews, (UINT*)(&uaUAViews));
 
-        /// unoptimized method: pd3dImmediateContext->Dispatch(particleCount, 1, 1);
-        pd3dImmediateContext->Dispatch(ceil(particleCount / PARTICLE_TGSIZE), 1, 1);
+        pd3dImmediateContext->Dispatch(ceil((float)particleCount / PARTICLE_TGSIZE), 1, 1);
 
         ID3D11UnorderedAccessView* uppUAViewNULL[3] = { nullptr, nullptr, nullptr };
         pd3dImmediateContext->CSSetUnorderedAccessViews(0, 3, uppUAViewNULL, (UINT*)(&uaUAViews));
@@ -542,13 +540,13 @@ HRESULT importFiles(){
     //set up second bunny
     Deformable body2("bunny_res3_scaled.obj", 1);
     body2.build();
-    body2.translate(2000, 0, 0);
+    body2.translate(3000, 0, 0);
     deformableObjects.push_back(body2);
 
     //set up third bunny
     Deformable body3("bunny_res3_scaled.obj", 2);
     body3.build();
-    body3.translate(2000, 2000, 0);
+    body3.translate(3000, 4000, 0);
     deformableObjects.push_back(body3);
 
     // Set variables

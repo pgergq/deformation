@@ -100,7 +100,7 @@ struct BVBox {
 
 // BVHCatalogue entry (for each object)
 struct BVHDesc {
-    uint array_offset;      // BVHTree offset in global array (for the entry's BVHTree)
+    uint array_offset;      // BVHTree offset in global array (for the objects's BVHTree)
     uint masspoint_count;   // masspoint count in BVHTree
     float min_x;            // bounding box coordinates
     float max_x;            // bounding box coordinates

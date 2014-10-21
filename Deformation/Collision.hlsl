@@ -76,7 +76,7 @@ void BVHUpdate(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 G
                 BVBox a = bvhdata[offset + 2 * (leveloffset + i) + 1];
                 BVBox b = bvhdata[offset + 2 * (leveloffset + i) + 2];
                 BVBox equ = { tmp.left_id, tmp.left_type, tmp.right_id, tmp.right_type,     
-                              max(a.max_x, b.max_x), min(a.min_x, b.min_x),
+                              min(a.min_x, b.min_x), max(a.max_x, b.max_x),
                               min(a.min_y, b.min_y), max(a.max_y, b.max_y),
                               min(a.min_z, b.min_z), max(a.max_z, b.max_z) };
                 bvhdata[offset + leveloffset + i] = equ;

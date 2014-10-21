@@ -158,7 +158,11 @@ $RECYCLE.BIN/
 # ===========================
 # Added folders
 assimp/
+
 DXUT/
+
 Media/
+
 *.rar
+
 Deformation/Deformation - backup.cpp
