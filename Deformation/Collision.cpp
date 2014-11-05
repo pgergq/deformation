@@ -32,7 +32,7 @@ BVHierarchy::BVHierarchy(MassIDTypeVector masspoints){
         x.push_back(masspoints[i]);
     }
     for (uint i = 0; i < ext; i++){
-        x.push_back(MassIDType(-1, 0, MASSPOINT{}));
+        x.push_back(MassIDType(-1, -1, MASSPOINT{}));
     }
 
     // sort and structurise input
@@ -65,7 +65,7 @@ bool sortZ(MassIDType a, MassIDType b){
 
 //--------------------------------------------------------------------------------------
 // Sort: sort masspoint+ID pairs: repeatedly by X-Y-Z coordinates
-//       mode: 0=X, 1=Y, 2=Z (sort
+//       mode: 0=X, 1=Y, 2=Z (sort)
 //--------------------------------------------------------------------------------------
 BVBoxVector BVHierarchy::sort(MassIDTypeVector masspoints, uint mode){
 
@@ -77,15 +77,18 @@ BVBoxVector BVHierarchy::sort(MassIDTypeVector masspoints, uint mode){
         BVBOX tmp;
         BVBoxVector ret;
 
-        // two invalid leaves, return empty vector
-        //if (std::get<0>(masspoints[0]) == -1 && std::get<0>(masspoints[1]) == -1){}
+        // two invalid leaves, signal with two '-1's
+        if (std::get<0>(masspoints[0]) == -1 && std::get<0>(masspoints[1]) == -1){
+            tmp.leftType = -1;
+            tmp.rightType = -1;
+        }
 
         // one valid and one invalid masspoint -> yippie, edge of the 'valid tree'
-        /*else*/ if (std::get<0>(masspoints[0]) != -1 && std::get<0>(masspoints[1]) == -1){
+        else if (std::get<0>(masspoints[0]) != -1 && std::get<0>(masspoints[1]) == -1){
             tmp.leftID = std::get<0>(masspoints[0]);
             tmp.leftType = std::get<1>(masspoints[0]);
             tmp.rightID = -1;
-            tmp.rightType = 0;
+            tmp.rightType = -1;         // -1 is for empty leaves
             tmp.minX = (std::get<2>(masspoints[0])).newpos.x - collisionRangeConstant;
             tmp.maxX = (std::get<2>(masspoints[0])).newpos.x + collisionRangeConstant;
             tmp.minY = (std::get<2>(masspoints[0])).newpos.y - collisionRangeConstant;
@@ -142,6 +145,8 @@ BVBoxVector BVHierarchy::sort(MassIDTypeVector masspoints, uint mode){
         BVBOX tmp2;                                     // tmp <- bounding box for each masspoint in masspoints
 
         if (x.size() != 0){                             // (check for empty subtrees)
+            tmp2.leftType = (x[0].leftType == -1 && x[0].rightType == -1)? -1 : 0;   // 0: valid tree node, -1: invalid (dead) tree node
+            tmp2.rightType = (y.size() != 0 && y[0].leftType == -1 && y[0].rightType == -1) ? -1 : 0;
             tmp2.minX = (y.size() != 0 ? std::min(x[0].minX, y[0].minX) : x[0].minX);
             tmp2.maxX = (y.size() != 0 ? std::max(x[0].maxX, y[0].maxX) : x[0].maxX);
             tmp2.minY = (y.size() != 0 ? std::min(x[0].minY, y[0].minY) : x[0].minY);

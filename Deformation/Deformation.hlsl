@@ -42,6 +42,21 @@ float3 acceleration(MassPoint a, MassPoint b, uint mode)
 	return (stiffness * normalize((b.newpos - a.newpos).xyz) * (length(a.newpos - b.newpos) - len) + damping * v) * im;
 }
 
+// collide to points in space (cpos = base point, xpos = colliding neighbour
+float3 collide(float3 cpos, float3 xpos){
+
+    // may the Force here be calculated
+    float dist = length(cpos - xpos);
+    float3 dir = normalize(cpos - xpos);
+
+    // repulsive force = direction * weight_from_distance
+
+    //if (dist < collision_range)
+    //return dir * min(exp_max, 1000000 * exp2((float)collision_range / dist));       // "távolságtartó"
+    //return dir * clamp(exp_max * (exp2((float)collision_range / dist) - 1), 0, exp_max);
+    return dir * 1000;
+}
+
 // generate index in first volcube from coordinates
 uint index_1(uint x, uint y, uint z){
     return z*cube_width*cube_width + y*cube_width + x;
@@ -56,6 +71,8 @@ uint index_2(uint x, uint y, uint z){
 bool between(float x, float a, float b){
     return (a <= x) && (x <= b);
 }
+
+
 
 
 
@@ -168,34 +185,47 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 
             // collision with another object
             else {
-                // do we have collision?
-                if (between(cpos.x, colldesc.min_x, colldesc.max_x) && between(cpos.y, colldesc.min_y, colldesc.max_y) && between(cpos.z, colldesc.min_z, colldesc.max_z)){
-                    
-                    for (uint i = colldesc.masspoint_count / 2; i < colldesc.masspoint_count; i++){     // for every leaf BVBox
 
-                        BVBox node = bvhdata[arr_off + i];                                              // arr_off + i = node index in bvhdata[]
+                if (between(cpos.x, colldesc.min_x, colldesc.max_x) && between(cpos.y, colldesc.min_y, colldesc.max_y) && between(cpos.z, colldesc.min_z, colldesc.max_z))
+                {
+                    // collision with the other object, compute forces (traverse tree)
+                    bool tree[1024];    // *TODO*: dynamic stack
+                    tree[0] = tree[1] = tree[2] = true;
+                    uint maxlevel = log2(colldesc.masspoint_count + 1);
+                    for (uint i = 1; i < maxlevel; i++){                                    // i = level number, root level already checked (collision)
+                        uint leveloffset = exp2(i) - 1;                                     // first node index of current level
 
-                        // cpos = current masspoint, xpos = colliding masspoint
-                        if (node.left_type == 1 || node.left_type == 2){                                // valid left leaf, calculate force
-                            float4 xpos = (node.left_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.left_id].newpos
-                                                                : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.left_id].newpos;
-                            // may the Force here be calculated
-                            float dist = length((cpos - xpos).xyz);
-                            float3 dir = normalize((cpos - xpos).xyz);
-                            // repulsive force = direction * weight_from_distance
-                            //if (dist < collision_range)
-                                //accel += dir * min(exp_max, 1000000 * exp2((float)collision_range / dist));       // "távolságtartó"
-                                accel += dir * clamp(exp_max * (exp2((float)collision_range / dist) - 1), 0, exp_max);
-                        }
-                        if (node.right_type == 1 || node.right_type == 2){                              // valid right leaf, calculate force
-                            float4 xpos = (node.right_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.right_id].newpos
-                                                                 : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.right_id].newpos;
-                            // may the Force here be calculated
-                            float dist = length((cpos - xpos).xyz);
-                            float3 dir = normalize((cpos - xpos).xyz);
-                            // repulsive force = direction * weight_from_distance
-                            //if (dist < collision_range)
-                                accel += dir * clamp(exp_max * (exp2((float)collision_range / dist) - 1), 0, exp_max);
+                        for (uint j = leveloffset; j < leveloffset * 2 + 1; j++){           // j = node index int the whole tree (for every node on the current level)
+                            BVBox node = bvhdata[arr_off + j];                              // arr_off + j = node index in bvhdata[]
+                            // not leaf level -> go below
+                            if (i != maxlevel - 1){
+                                // colliding parent box AND inside bounding box -> check children nodes
+                                // *TODO*: optimize axes
+                                if (tree[j] && between(cpos.x, node.min_x, node.max_x) && between(cpos.y, node.min_x, node.max_y) && between(cpos.z, node.min_z, node.max_z)){
+                                    tree[j * 2 + 1] = true;
+                                    tree[j * 2 + 2] = true;
+                                }
+                                else {
+                                    tree[j * 2 + 1] = false;
+                                    tree[j * 2 + 2] = false;
+                                }
+                            }
+                            // leaf level -> calculate force
+                            // cpos = current masspoint, xpos = colliding masspoint
+                            else {
+                                if (tree[j] && node.left_type != -1){                        // valid left leaf, calculate force
+                                    float4 xpos = (node.left_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.left_id].newpos
+                                        : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.left_id].newpos;
+                                    // collision
+                                    accel += collide(cpos.xyz, xpos.xyz);
+                                }
+                                if (tree[j] && node.right_type != -1){                       // valid right leaf, calculate force
+                                    float4 xpos = (node.right_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.right_id].newpos
+                                        : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.right_id].newpos;
+                                    // collision
+                                    accel += collide(cpos.xyz, xpos.xyz);
+                                }
+                            }
                         }
                     }
                 }
@@ -322,33 +352,47 @@ void CSMain2(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 
             // collision with another object
             else {
-                // do we have collision?
-                if (between(cpos.x, colldesc.min_x, colldesc.max_x) && between(cpos.y, colldesc.min_y, colldesc.max_y) && between(cpos.z, colldesc.min_z, colldesc.max_z)){
 
-                    for (uint i = colldesc.masspoint_count / 2; i < colldesc.masspoint_count; i++){     // for every leaf BVBox
+                if (between(cpos.x, colldesc.min_x, colldesc.max_x) && between(cpos.y, colldesc.min_y, colldesc.max_y) && between(cpos.z, colldesc.min_z, colldesc.max_z))
+                {
+                    // collision with the other object, compute forces (traverse tree)
+                    bool tree[1024];    // *TODO*: dynamic stack
+                    tree[0] = tree[1] = tree[2] = true;
+                    uint maxlevel = log2(colldesc.masspoint_count + 1);
+                    for (uint i = 1; i < maxlevel; i++){                                    // i = level number, root level already checked (collision)
+                        uint leveloffset = exp2(i) - 1;                                     // first node index of current level
 
-                        BVBox node = bvhdata[arr_off + i];                                              // arr_off + i = node index in bvhdata[]
-
-                        // cpos = current masspoint, xpos = colliding masspoint
-                        if (node.left_type == 1 || node.left_type == 2){                                // valid left leaf, calculate force
-                            float4 xpos = (node.left_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.left_id].newpos
-                                                                : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.left_id].newpos;
-                            // may the Force here be calculated
-                            float dist = length((cpos - xpos).xyz);
-                            float3 dir = normalize((cpos - xpos).xyz);
-                            // repulsive force = direction * weight_from_distance
-                            //if (dist < collision_range)
-                                accel += dir * clamp(exp_max * (exp2((float)collision_range / dist) - 1), 0, exp_max);
-                        }
-                        if (node.right_type == 1 || node.right_type == 2){                              // valid right leaf, calculate force
-                            float4 xpos = (node.right_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.right_id].newpos
-                                                                    : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.right_id].newpos;
-                            // may the Force here be calculated
-                            float dist = length((cpos - xpos).xyz);
-                            float3 dir = normalize((cpos - xpos).xyz);
-                            // repulsive force = direction * weight_from_distance
-                            //if (dist < collision_range)
-                                accel += dir * clamp(exp_max * (exp2((float)collision_range / dist) - 1), 0, exp_max);
+                        for (uint j = leveloffset; j < leveloffset * 2 + 1; j++){           // j = node index int the whole tree (for every node on the current level)
+                            BVBox node = bvhdata[arr_off + j];                              // arr_off + j = node index in bvhdata[]
+                            // not leaf level -> go below
+                            if (i != maxlevel - 1){
+                                // colliding parent box AND inside bounding box -> check children nodes
+                                // *TODO*: optimize axes
+                                if (tree[j] && between(cpos.x, node.min_x, node.max_x) && between(cpos.y, node.min_x, node.max_y) && between(cpos.z, node.min_z, node.max_z)){
+                                    tree[j * 2 + 1] = true;
+                                    tree[j * 2 + 2] = true;
+                                }
+                                else {
+                                    tree[j * 2 + 1] = false;
+                                    tree[j * 2 + 2] = false;
+                                }
+                            }
+                            // leaf level -> calculate force
+                            // cpos = current masspoint, xpos = colliding masspoint
+                            else {
+                                if (tree[j] && node.left_type != -1){                        // valid left leaf, calculate force
+                                    float4 xpos = (node.left_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.left_id].newpos
+                                        : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.left_id].newpos;
+                                    // collision
+                                    accel += collide(cpos.xyz, xpos.xyz);
+                                }
+                                if (tree[j] && node.right_type != -1){                       // valid right leaf, calculate force
+                                    float4 xpos = (node.right_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.right_id].newpos
+                                        : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.right_id].newpos;
+                                    // collision
+                                    accel += collide(cpos.xyz, xpos.xyz);
+                                }
+                            }
                         }
                     }
                 }

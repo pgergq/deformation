@@ -87,7 +87,7 @@ struct Indexer
 // BVHData entry (bounding box)
 struct BVBox {
     int left_id;            // masspoint ID of left child (-1: not leaf), index in masscube!
-    int left_type;          // masspoint type (1st or second masscube)
+    int left_type;          // masspoint type (1st or second masscube, 0: treenode, -1: tree leaf)
     int right_id;           // masspoint ID of right child, index in masscube!
     int right_type;         // masspoint type
     float min_x;            // bounding box coordinates
