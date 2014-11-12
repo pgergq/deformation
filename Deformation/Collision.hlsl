@@ -41,28 +41,24 @@ void BVHUpdate(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 G
 
                 BVBox tmp = bvhdata[offset + leveloffset + i];
                 MassPoint ml, mr;
-                bool validleft = false;     // true if left and right children masspoints are valid
-                bool validright = false;
+                bool validleft = tmp.left_type != -1;                     // true if left and right children masspoints are valid
+                bool validright = tmp.right_type != -1;
                 if (tmp.left_id != (-1) && tmp.left_type == 1){ // left child valid, read from masscube data
                     // index: objnum * masscube(1|2)_size + index_in_cube
                     ml = volcube1[objnum*cube_width*cube_width*cube_width + tmp.left_id];
-                    validleft = true;
                 }
                 else if (tmp.left_id != (-1) && tmp.left_type == 2){
                     // index: objnum * masscube(1|2)_size + index_in_cube
                     ml = volcube2[objnum*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + tmp.left_id];
-                    validleft = true;
                 }
 
                 if (tmp.right_id != (-1) && tmp.right_type == 1){ // right child valid, read from masscube data
                     // index: objnum * masscube(1|2)_size + index_in_cube
                     mr = volcube1[objnum*cube_width*cube_width*cube_width + tmp.right_id];
-                    validright = true;
                 }
                 else if (tmp.right_id != (-1) && tmp.right_type == 2){
                     // index: objnum * masscube(1|2)_size + index_in_cube
                     mr = volcube2[objnum*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + tmp.right_id];
-                    validright = true;
                 }
 
                 BVBox equ;
@@ -100,34 +96,35 @@ void BVHUpdate(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 G
                 BVBox tmp = bvhdata[offset + leveloffset + i];
                 BVBox a = bvhdata[offset + 2 * (leveloffset + i) + 1];
                 BVBox b = bvhdata[offset + 2 * (leveloffset + i) + 2];
-                bool validleft = false;                             //***************************
-                bool validright = false;                            //***************************
+                bool validleft = tmp.left_type != -1;
+                bool validright = tmp.right_type != -1;
 
-                //BVBox equ;
-                //equ.left_id = tmp.left_id;
-                //equ.left_type = tmp.left_type;
-                //equ.right_id = tmp.right_id;
-                //equ.right_type = tmp.right_type;
-                //// two valid children masspoint
-                //if (validleft && validright){
-                //    equ.min_x = min(a.min_x, b.min_x);
-                //    equ.max_x = max(a.max_x, b.max_x);
-                //    equ.min_y = min(a.min_y, b.min_y);
-                //    equ.max_y = max(a.max_y, b.max_y);
-                //    equ.min_z = min(a.min_z, b.min_z);
-                //    equ.max_z = max(a.max_z, b.max_z);
-                //}
-                //// only one valid child (must be on the left side)
-                //else if (validleft && !validright){
-                //    equ.min_x = a.min_x - collision_range;
-                //    equ.max_x = a.max_x + collision_range;
-                //    equ.min_y = a.min_y - collision_range;
-                //    equ.max_y = a.max_y + collision_range;
-                //    equ.min_z = a.min_z - collision_range;
-                //    equ.max_z = a.max_z + collision_range;
-                //}
+                BVBox equ;
+                equ.left_id = tmp.left_id;
+                equ.left_type = tmp.left_type;
+                equ.right_id = tmp.right_id;
+                equ.right_type = tmp.right_type;
 
-                //bvhdata[offset + leveloffset + i] = equ;
+                // two valid children masspoint
+                if (validleft && validright){
+                    equ.min_x = min(a.min_x, b.min_x);
+                    equ.max_x = max(a.max_x, b.max_x);
+                    equ.min_y = min(a.min_y, b.min_y);
+                    equ.max_y = max(a.max_y, b.max_y);
+                    equ.min_z = min(a.min_z, b.min_z);
+                    equ.max_z = max(a.max_z, b.max_z);
+                }
+                // only one valid child (must be on the left side)
+                else if (validleft && !validright){
+                    equ.min_x = a.min_x;
+                    equ.max_x = a.max_x;
+                    equ.min_y = a.min_y;
+                    equ.max_y = a.max_y;
+                    equ.min_z = a.min_z;
+                    equ.max_z = a.max_z;
+                }
+
+                bvhdata[offset + leveloffset + i] = equ;
             }
         }
 
