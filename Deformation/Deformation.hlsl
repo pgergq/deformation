@@ -42,30 +42,24 @@ float3 acceleration(MassPoint a, MassPoint b, uint mode)
 	return (stiffness * normalize((b.newpos - a.newpos).xyz) * (length(a.newpos - b.newpos) - len) + damping * v) * im;
 }
 
+
 // collide to points in space (cpos = base point, xpos = colliding neighbour
 float3 collide(float3 cpos, float3 xpos){
 
     // may the Force here be calculated
     float dist = length(cpos - xpos);
     float3 dir = normalize(cpos - xpos);
+    float3 ret = float3(0, 0, 0);
 
     // repulsive force = direction * weight_from_distance
+    ret = dir * min(exp_max, 1000000 * exp2(collision_range - dist));      // exponential
+    //ret = dir * min(exp_max, ((float)1000/collision_range)*(exp2((float)collision_range / dist)));     // hybrid
+    //ret = dir * min(100000, 10 * (float)collision_range / dist);     // fractional
 
-    //if (dist < collision_range)
-    //return dir * min(exp_max, 1000000 * exp2((float)collision_range / dist));       // "távolságtartó"
-    //return dir * clamp(exp_max * (exp2((float)collision_range / dist) - 1), 0, exp_max);
-    return dir * 1000;
+    ret = dir * 1000000;
+    return ret;
 }
 
-// generate index in first volcube from coordinates
-uint index_1(uint x, uint y, uint z){
-    return z*cube_width*cube_width + y*cube_width + x;
-}
-
-// generate index in second volcube from coordinates
-uint index_2(uint x, uint y, uint z){
-    return z*(cube_width + 1)*(cube_width + 1) + y*(cube_width + 1) + x;
-}
 
 // x is between a and b values
 bool between(float x, float a, float b){
@@ -73,6 +67,72 @@ bool between(float x, float a, float b){
 }
 
 
+// return collision detection result (colliding forces affecting the current masspoint)
+float3 collision_detection(MassPoint old, uint objnum){
+
+    float3 accel = float3(0, 0, 0);
+    // Collision detection
+    float4 cpos = old.newpos;                   // current masspoint position
+    for (uint o = 0; o < object_count; o++){    // for every object in the simulation
+
+        BVHDesc colldesc = bvhdesc[o];          // colliding? object's desc
+        uint arr_off = colldesc.array_offset;   // BVHTree offset in bvhdata[]
+
+        // o == objnum => self-collision
+        if (o == objnum){
+            // *TODO*: self collision
+        }
+
+        // collision with another object
+        else {
+
+            if (between(cpos.x, colldesc.min_x, colldesc.max_x) && between(cpos.y, colldesc.min_y, colldesc.max_y) && between(cpos.z, colldesc.min_z, colldesc.max_z))
+            {
+                // collision with the other object, compute forces (traverse tree)
+                bool tree[1024];    // *TODO*: dynamic stack
+                tree[0] = tree[1] = tree[2] = true;
+                uint maxlevel = log2(colldesc.masspoint_count + 1);
+                for (uint i = 1; i < maxlevel; i++){                                    // i = level number, root level already checked (collision)
+                    uint leveloffset = exp2(i) - 1;                                     // first node index of current level
+
+                    for (uint j = leveloffset; j < leveloffset * 2 + 1; j++){           // j = node index int the whole tree (for every node on the current level)
+                        BVBox node = bvhdata[arr_off + j];                              // arr_off + j = node index in bvhdata[]
+                        // not leaf level -> go below
+                        if (i != maxlevel - 1){
+                            // colliding parent box AND inside bounding box -> check children nodes
+                            // *TODO*: optimize axes
+                            if (tree[j] && between(cpos.x, node.min_x, node.max_x) && between(cpos.y, node.min_x, node.max_y) && between(cpos.z, node.min_z, node.max_z)){
+                                tree[j * 2 + 1] = true;
+                                tree[j * 2 + 2] = true;
+                            }
+                            else {
+                                tree[j * 2 + 1] = false;
+                                tree[j * 2 + 2] = false;
+                            }
+                        }
+                        // leaf level -> calculate force
+                        // cpos = current masspoint, xpos = colliding masspoint
+                        else {
+                            if (tree[j] && node.left_type != -1){                        // valid left leaf, calculate force
+                                float4 xpos = (node.left_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.left_id].newpos
+                                    : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.left_id].newpos;
+                                // collision
+                                accel += collide(cpos.xyz, xpos.xyz);
+                            }
+                            if (tree[j] && node.right_type != -1){                       // valid right leaf, calculate force
+                                float4 xpos = (node.right_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.right_id].newpos
+                                    : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.right_id].newpos;
+                                // collision
+                                accel += collide(cpos.xyz, xpos.xyz);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return accel;
+}
 
 
 
@@ -115,6 +175,9 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 		uint same = old.neighbour_same;
 		uint other = old.neighbour_other;
 		int notstaticmass = (same | other) == 0 ? 0 : 1;	//0 = static masspoint, no neighbours
+        if (notstaticmass == 0){
+            return;
+        }
 
 		/// Sum neighbouring forces
 		float3 accel = float3(0, notstaticmass*gravity*im, 0);		// gravity
@@ -170,67 +233,8 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 		if (other & NB_OTHER_FAR_TOP_RIGHT)
             accel += acceleration(old, ovolcube2[ind2 + (cube_width + 1)*(cube_width + 1) + cube_width + 2], 1);
 
-        
-        // Collision detection
-        float4 cpos = old.newpos;                   // current masspoint position
-        for (uint o = 0; o < object_count; o++){    // for every object in the simulation
-
-            BVHDesc colldesc = bvhdesc[o];          // colliding? object's desc
-            uint arr_off = colldesc.array_offset;   // BVHTree offset in bvhdata[]
-            
-            // o == objnum => self-collision
-            if (o == objnum){
-                // *TODO*: self collision
-            }
-
-            // collision with another object
-            else {
-
-                if (between(cpos.x, colldesc.min_x, colldesc.max_x) && between(cpos.y, colldesc.min_y, colldesc.max_y) && between(cpos.z, colldesc.min_z, colldesc.max_z))
-                {
-                    // collision with the other object, compute forces (traverse tree)
-                    bool tree[1024];    // *TODO*: dynamic stack
-                    tree[0] = tree[1] = tree[2] = true;
-                    uint maxlevel = log2(colldesc.masspoint_count + 1);
-                    for (uint i = 1; i < maxlevel; i++){                                    // i = level number, root level already checked (collision)
-                        uint leveloffset = exp2(i) - 1;                                     // first node index of current level
-
-                        for (uint j = leveloffset; j < leveloffset * 2 + 1; j++){           // j = node index int the whole tree (for every node on the current level)
-                            BVBox node = bvhdata[arr_off + j];                              // arr_off + j = node index in bvhdata[]
-                            // not leaf level -> go below
-                            if (i != maxlevel - 1){
-                                // colliding parent box AND inside bounding box -> check children nodes
-                                // *TODO*: optimize axes
-                                if (tree[j] && between(cpos.x, node.min_x, node.max_x) && between(cpos.y, node.min_x, node.max_y) && between(cpos.z, node.min_z, node.max_z)){
-                                    tree[j * 2 + 1] = true;
-                                    tree[j * 2 + 2] = true;
-                                }
-                                else {
-                                    tree[j * 2 + 1] = false;
-                                    tree[j * 2 + 2] = false;
-                                }
-                            }
-                            // leaf level -> calculate force
-                            // cpos = current masspoint, xpos = colliding masspoint
-                            else {
-                                if (tree[j] && node.left_type != -1){                        // valid left leaf, calculate force
-                                    float4 xpos = (node.left_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.left_id].newpos
-                                        : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.left_id].newpos;
-                                    // collision
-                                    accel += collide(cpos.xyz, xpos.xyz);
-                                }
-                                if (tree[j] && node.right_type != -1){                       // valid right leaf, calculate force
-                                    float4 xpos = (node.right_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.right_id].newpos
-                                        : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.right_id].newpos;
-                                    // collision
-                                    accel += collide(cpos.xyz, xpos.xyz);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // collision detection
+        accel += collision_detection(old, objnum);
 
 
 		// Verlet + Acceleration
@@ -282,6 +286,9 @@ void CSMain2(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
         uint same = old.neighbour_same;
         uint other = old.neighbour_other;
 		int notstaticmass = (same | other) == 0 ? 0 : 1;	//0 = static masspoint, no neighbours
+        if (notstaticmass == 0){
+            return;
+        }
 
 		/// Sum neighbouring forces
 		float3 accel = float3(0, notstaticmass*gravity*im, 0);		// gravity
@@ -337,68 +344,8 @@ void CSMain2(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 		if (other & NB_OTHER_FAR_TOP_RIGHT)	// back, topright
             accel += acceleration(old, ovolcube1[ind1], 1);
 
-
-        // Collision detection
-        float4 cpos = old.newpos;                   // current masspoint position
-        for (uint o = 0; o < object_count; o++){    // for every object in the simulation
-
-            BVHDesc colldesc = bvhdesc[o];          // colliding? object's desc
-            uint arr_off = colldesc.array_offset;          // BVHTree offset in bvhdata[]
-
-            // o == objnum => self-collision
-            if (o == objnum){
-                // *TODO*
-            }
-
-            // collision with another object
-            else {
-
-                if (between(cpos.x, colldesc.min_x, colldesc.max_x) && between(cpos.y, colldesc.min_y, colldesc.max_y) && between(cpos.z, colldesc.min_z, colldesc.max_z))
-                {
-                    // collision with the other object, compute forces (traverse tree)
-                    bool tree[1024];    // *TODO*: dynamic stack
-                    tree[0] = tree[1] = tree[2] = true;
-                    uint maxlevel = log2(colldesc.masspoint_count + 1);
-                    for (uint i = 1; i < maxlevel; i++){                                    // i = level number, root level already checked (collision)
-                        uint leveloffset = exp2(i) - 1;                                     // first node index of current level
-
-                        for (uint j = leveloffset; j < leveloffset * 2 + 1; j++){           // j = node index int the whole tree (for every node on the current level)
-                            BVBox node = bvhdata[arr_off + j];                              // arr_off + j = node index in bvhdata[]
-                            // not leaf level -> go below
-                            if (i != maxlevel - 1){
-                                // colliding parent box AND inside bounding box -> check children nodes
-                                // *TODO*: optimize axes
-                                if (tree[j] && between(cpos.x, node.min_x, node.max_x) && between(cpos.y, node.min_x, node.max_y) && between(cpos.z, node.min_z, node.max_z)){
-                                    tree[j * 2 + 1] = true;
-                                    tree[j * 2 + 2] = true;
-                                }
-                                else {
-                                    tree[j * 2 + 1] = false;
-                                    tree[j * 2 + 2] = false;
-                                }
-                            }
-                            // leaf level -> calculate force
-                            // cpos = current masspoint, xpos = colliding masspoint
-                            else {
-                                if (tree[j] && node.left_type != -1){                        // valid left leaf, calculate force
-                                    float4 xpos = (node.left_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.left_id].newpos
-                                        : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.left_id].newpos;
-                                    // collision
-                                    accel += collide(cpos.xyz, xpos.xyz);
-                                }
-                                if (tree[j] && node.right_type != -1){                       // valid right leaf, calculate force
-                                    float4 xpos = (node.right_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.right_id].newpos
-                                        : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.right_id].newpos;
-                                    // collision
-                                    accel += collide(cpos.xyz, xpos.xyz);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
+        // collision detection
+        accel += collision_detection(old, objnum);
 
 		// Verlet + Acceleration
         if (old.newpos.y < table_pos && notstaticmass){  // table
