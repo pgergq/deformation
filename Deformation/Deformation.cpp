@@ -105,6 +105,7 @@ ID3D11PixelShader*                  pickingPS1 = nullptr;
 ID3D11PixelShader*                  pickingPS2 = nullptr;
 ID3D11PixelShader*                  shadowPS = nullptr;
 ID3D11VertexShader*                 renderVS = nullptr;
+ID3D11VertexShader*                 shadowVS = nullptr;
 
 // Scene variables
 std::vector<Deformable>             deformableObjects;              // scene objects
@@ -584,7 +585,8 @@ HRESULT initShaders(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediate
     ID3DBlob* pBlobRenderParticlesPS = nullptr;
     ID3DBlob* pBlobModelPS1 = nullptr;
     ID3DBlob* pBlobModelPS2 = nullptr;
-    ID3DBlob* pBlobShadowPS = nullptr;
+    //ID3DBlob* pBlobShadowPS = nullptr;
+    ID3DBlob* pBlobShadowVS = nullptr;
     ID3DBlob* pBlobCalc1CS = nullptr;
     ID3DBlob* pBlobCalc2CS = nullptr;
     ID3DBlob* pBlobUpdateCS = nullptr;
@@ -596,7 +598,8 @@ HRESULT initShaders(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediate
     V_RETURN(DXUTCompileFromFile(L"ParticleDraw.hlsl", nullptr, "PSParticleDraw", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobRenderParticlesPS));
     V_RETURN(DXUTCompileFromFile(L"ParticleDraw.hlsl", nullptr, "PSModelDraw1", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobModelPS1));
     V_RETURN(DXUTCompileFromFile(L"ParticleDraw.hlsl", nullptr, "PSModelDraw2", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobModelPS2));
-    V_RETURN(DXUTCompileFromFile(L"ParticleDraw.hlsl", nullptr, "PSShadow", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobShadowPS));
+    V_RETURN(DXUTCompileFromFile(L"ParticleDraw.hlsl", nullptr, "VSShadow", "vs_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobShadowVS));
+    //V_RETURN(DXUTCompileFromFile(L"ParticleDraw.hlsl", nullptr, "PSShadow", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobShadowPS));
     V_RETURN(DXUTCompileFromFile(L"Collision.hlsl", nullptr, "BVHUpdate", "cs_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobBVHCS));
     V_RETURN(DXUTCompileFromFile(L"Deformation.hlsl", nullptr, "CSMain1", "cs_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobCalc1CS));
     V_RETURN(DXUTCompileFromFile(L"Deformation.hlsl", nullptr, "CSMain2", "cs_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &pBlobCalc2CS));
@@ -618,8 +621,11 @@ HRESULT initShaders(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediate
     V_RETURN(pd3dDevice->CreatePixelShader(pBlobModelPS2->GetBufferPointer(), pBlobModelPS2->GetBufferSize(), nullptr, &pickingPS2));
     DXUT_SetDebugName(pickingPS2, "PSModelDraw2");
 
-    V_RETURN(pd3dDevice->CreatePixelShader(pBlobShadowPS->GetBufferPointer(), pBlobShadowPS->GetBufferSize(), nullptr, &shadowPS));
-    DXUT_SetDebugName(shadowPS, "PSShadow");
+    V_RETURN(pd3dDevice->CreateVertexShader(pBlobShadowVS->GetBufferPointer(), pBlobShadowVS->GetBufferSize(), nullptr, &shadowVS));
+    DXUT_SetDebugName(shadowVS, "VSShadow");
+    
+    //V_RETURN(pd3dDevice->CreatePixelShader(pBlobShadowPS->GetBufferPointer(), pBlobShadowPS->GetBufferSize(), nullptr, &shadowPS));
+    //DXUT_SetDebugName(shadowPS, "PSShadow");
 
     V_RETURN(pd3dDevice->CreateComputeShader(pBlobBVHCS->GetBufferPointer(), pBlobBVHCS->GetBufferSize(), nullptr, &bvhCS));
     DXUT_SetDebugName(bvhCS, "BVHUpdateCS");
@@ -646,7 +652,8 @@ HRESULT initShaders(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediate
     SAFE_RELEASE(pBlobRenderParticlesPS);
     SAFE_RELEASE(pBlobModelPS1);
     SAFE_RELEASE(pBlobModelPS2);
-    SAFE_RELEASE(pBlobShadowPS);
+    SAFE_RELEASE(pBlobShadowVS);
+    //SAFE_RELEASE(pBlobShadowPS);
     SAFE_RELEASE(pBlobBVHCS);
     SAFE_RELEASE(pBlobCalc1CS);
     SAFE_RELEASE(pBlobCalc2CS);
@@ -1083,9 +1090,6 @@ HRESULT initShadow(ID3D11Device* pd3dDevice, int width, int height)
     SAFE_RELEASE(shadowSRV);
     
     D3D11_TEXTURE2D_DESC tdesc;
-    D3D11_DEPTH_STENCIL_VIEW_DESC dsvdesc;
-    D3D11_SHADER_RESOURCE_VIEW_DESC srvdesc;
-
     ZeroMemory(&tdesc, sizeof(tdesc));
     tdesc.Width = width;
     tdesc.Height = height;
@@ -1100,21 +1104,20 @@ HRESULT initShadow(ID3D11Device* pd3dDevice, int width, int height)
     pd3dDevice->CreateTexture2D(&tdesc, nullptr, &shadowTexture);
     DXUT_SetDebugName(shadowTexture, "Shadow TEX");
 
-
-    ZeroMemory(&dsvdesc, sizeof(dsvdesc));
-    dsvdesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    dsvdesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-    dsvdesc.Texture2D.MipSlice = 0;
-    pd3dDevice->CreateDepthStencilView(shadowTexture, &dsvdesc, &shadowDSV);
+    D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc;
+    ZeroMemory(&depthStencilViewDesc, sizeof(D3D11_DEPTH_STENCIL_VIEW_DESC));
+    depthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    depthStencilViewDesc.Texture2D.MipSlice = 0;
+    pd3dDevice->CreateDepthStencilView(shadowTexture, &depthStencilViewDesc, &shadowDSV);
     DXUT_SetDebugName(shadowDSV, "Shadow DSV");
-    
 
-    ZeroMemory(&srvdesc, sizeof(srvdesc));
-    srvdesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-    srvdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    srvdesc.Texture2D.MostDetailedMip = 0;
-    srvdesc.Texture2D.MipLevels = 1;
-    pd3dDevice->CreateShaderResourceView(shadowTexture, &srvdesc, &shadowSRV);
+    D3D11_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc;
+    ZeroMemory(&shaderResourceViewDesc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
+    shaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    shaderResourceViewDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+    shaderResourceViewDesc.Texture2D.MipLevels = 1;
+    pd3dDevice->CreateShaderResourceView(shadowTexture, &shaderResourceViewDesc, &shadowSRV);
     DXUT_SetDebugName(shadowSRV, "Shadow SRV");
 
     return S_OK;
@@ -1283,8 +1286,7 @@ bool drawObjects(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
 
     pd3dImmediateContext->VSSetShader(renderVS, nullptr, 0);
     pd3dImmediateContext->GSSetShader(renderGS, nullptr, 0);
-    //pd3dImmediateContext->PSSetShader(renderPS, nullptr, 0);
-    pd3dImmediateContext->PSSetShader(shadowPS, nullptr, 0);
+    pd3dImmediateContext->PSSetShader(renderPS, nullptr, 0);
 
     ID3D11ShaderResourceView* aRViews[1] = { particleSRV1 };
     pd3dImmediateContext->VSSetShaderResources(0, 1, aRViews);
@@ -1327,23 +1329,25 @@ bool drawObjects(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
 bool drawShadow(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXMMATRIX mProj)
 {
 
-    pd3dImmediateContext->OMSetRenderTargets(0, 0, shadowDSV);
+    //pd3dImmediateContext->ClearRenderTargetView(DXUTGetD3D11RenderTargetView(), Colors::Black);
+    auto pRTV = DXUTGetD3D11RenderTargetView();
+    auto pDSV = DXUTGetD3D11DepthStencilView();
     pd3dImmediateContext->ClearDepthStencilView(shadowDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
+    pd3dImmediateContext->OMSetRenderTargets(0, nullptr, shadowDSV);
+    
+    ID3D11BlendState *pBlendState0 = nullptr;
+    ID3D11DepthStencilState *pDepthStencilState0 = nullptr;
+    UINT SampleMask0, StencilRef0;
+    XMFLOAT4 BlendFactor0;
+    pd3dImmediateContext->OMGetBlendState(&pBlendState0, &BlendFactor0.x, &SampleMask0);
+    pd3dImmediateContext->OMGetDepthStencilState(&pDepthStencilState0, &StencilRef0);
 
-    //ID3D11BlendState *pBlendState0 = nullptr;
-    //ID3D11DepthStencilState *pDepthStencilState0 = nullptr;
-    //UINT SampleMask0, StencilRef0;
-    //XMFLOAT4 BlendFactor0;
-    //pd3dImmediateContext->OMGetBlendState(&pBlendState0, &BlendFactor0.x, &SampleMask0);
-    //pd3dImmediateContext->OMGetDepthStencilState(&pDepthStencilState0, &StencilRef0);
+    pd3dImmediateContext->VSSetShader(shadowVS, nullptr, 0);
+    pd3dImmediateContext->GSSetShader(nullptr, nullptr, 0);
+    pd3dImmediateContext->PSSetShader(nullptr, nullptr, 0);
 
-    pd3dImmediateContext->VSSetShader(renderVS, nullptr, 0);
-    pd3dImmediateContext->GSSetShader(renderGS, nullptr, 0);
-    pd3dImmediateContext->PSSetShader(shadowPS, nullptr, 0);
-
-    //ID3D11ShaderResourceView* aRViews[1] = { particleSRV1 };
-    //pd3dImmediateContext->VSSetShaderResources(0, 1, aRViews);
-
+    ID3D11ShaderResourceView* aRViews[1] = { particleSRV1 };
+    pd3dImmediateContext->VSSetShaderResources(0, 1, aRViews);
 
     D3D11_MAPPED_SUBRESOURCE MappedResource;
     pd3dImmediateContext->Map(gsConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource);
@@ -1356,27 +1360,28 @@ bool drawShadow(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXMM
     pCBGS->lightCol = lightCol;
 
     pd3dImmediateContext->Unmap(gsConstantBuffer, 0);
-    pd3dImmediateContext->GSSetConstantBuffers(0, 1, &gsConstantBuffer);
+    pd3dImmediateContext->VSSetConstantBuffers(0, 1, &gsConstantBuffer);
 
+    pd3dImmediateContext->PSSetShaderResources(0, 1, &particleTextureSRV);
+    pd3dImmediateContext->PSSetSamplers(0, 1, &samplerState);
 
-    //pd3dImmediateContext->PSSetShaderResources(0, 1, &particleTextureSRV);
-    //pd3dImmediateContext->PSSetSamplers(0, 1, &samplerState);
+    pd3dImmediateContext->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 
-    //pd3dImmediateContext->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
-    //pd3dImmediateContext->OMSetDepthStencilState(depthStencilState, 0);
+    pd3dImmediateContext->OMSetDepthStencilState(nullptr, 0);
 
 
     // Render information: pos from light
     pd3dImmediateContext->Draw(particleCount, 0);
 
 
-    //ID3D11ShaderResourceView* ppSRVNULL[1] = { nullptr };
-    //pd3dImmediateContext->VSSetShaderResources(0, 1, ppSRVNULL);
-    //pd3dImmediateContext->PSSetShaderResources(0, 1, ppSRVNULL);
+    ID3D11ShaderResourceView* ppSRVNULL[1] = { nullptr };
+    pd3dImmediateContext->VSSetShaderResources(0, 1, ppSRVNULL);
+    pd3dImmediateContext->PSSetShaderResources(0, 1, ppSRVNULL);
 
-    //pd3dImmediateContext->GSSetShader(nullptr, nullptr, 0);
-    //pd3dImmediateContext->OMSetBlendState(pBlendState0, &BlendFactor0.x, SampleMask0); SAFE_RELEASE(pBlendState0);
-    //pd3dImmediateContext->OMSetDepthStencilState(pDepthStencilState0, StencilRef0); SAFE_RELEASE(pDepthStencilState0);
+    pd3dImmediateContext->GSSetShader(nullptr, nullptr, 0);
+    pd3dImmediateContext->OMSetRenderTargets(1, &pRTV, pDSV);
+    pd3dImmediateContext->OMSetBlendState(pBlendState0, &BlendFactor0.x, SampleMask0); SAFE_RELEASE(pBlendState0);
+    pd3dImmediateContext->OMSetDepthStencilState(pDepthStencilState0, StencilRef0); SAFE_RELEASE(pDepthStencilState0);
 
     return true;
 }
@@ -1395,7 +1400,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
     XMMATRIX mProj = camera.GetProjMatrix();
 
     // Render shadow mapping data to texture
-    //drawShadow(pd3dImmediateContext, mView, mProj);
+    drawShadow(pd3dImmediateContext, mView, mProj);
 
     // Render the model first for picking, only if RMBUTTONDOWN happened
     if (renderPicking){

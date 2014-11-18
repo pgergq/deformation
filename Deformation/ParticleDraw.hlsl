@@ -17,6 +17,11 @@ struct VSParticle
 	float4 mpid2		: MPID2;
 };
 
+struct ShadowPos
+{
+    float4 pos          : SV_Position;
+};
+
 struct GSParticleDrawOut
 {
 	float2 tex			: TEXCOORD0;
@@ -173,10 +178,14 @@ float4 PSModelDraw2(PSParticleDrawIn input) : SV_Target
 	return float4(input.mpid2, 1.0f);
 }
 
+////////// Shadow mapping
+
 //
-// PS for shadow mapping
+// Shadow VS
 //
-float4 PSShadow(PSParticleDrawIn input) : SV_Target
+ShadowPos VSShadow(uint id : SV_VertexID)
 {
-    return input.shpos;
+    ShadowPos output;
+    output.pos = mul(g_bufParticle[id].pos, g_mLightViewProj);
+    return output;
 }
