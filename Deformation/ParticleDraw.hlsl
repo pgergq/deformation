@@ -23,6 +23,7 @@ struct GSParticleDrawOut
 	float3 mpid1		: MPID1;
 	float3 mpid2		: MPID2;
 	float4 color		: COLOR;
+    float4 shpos        : SHPOS;
 	float4 pos			: SV_Position;
 };
 
@@ -32,6 +33,7 @@ struct PSParticleDrawIn
 	float3 mpid1		: MPID1;
 	float3 mpid2		: MPID2;
 	float4 color		: COLOR;
+    float4 shpos        : SHPOS;
 };
 
 Texture2D g_txDiffuse;
@@ -49,6 +51,7 @@ cbuffer cb0
 {
 	row_major float4x4 g_mWorldViewProj;
 	row_major float4x4 g_mInvView;
+    row_major float4x4 g_mLightViewProj;
 	float4 eyepos;
 	float4 lightpos;
     float4 lightcol;
@@ -139,6 +142,8 @@ void GSParticleDraw(point VSParticle input[1], inout TriangleStream<GSParticleDr
 		output.tex = g_texcoords[i];
 		output.mpid1 = input[0].mpid1.xyz;
 		output.mpid2 = input[0].mpid2.xyz;
+        //shadow data
+        output.shpos = mul(float4(position, 1.0), g_mLightViewProj);
 		SpriteStream.Append(output);
 	}
 	SpriteStream.RestartStrip();
@@ -166,4 +171,12 @@ float4 PSModelDraw1(PSParticleDrawIn input) : SV_Target
 float4 PSModelDraw2(PSParticleDrawIn input) : SV_Target
 {
 	return float4(input.mpid2, 1.0f);
+}
+
+//
+// PS for shadow mapping
+//
+float4 PSShadow(PSParticleDrawIn input) : SV_Target
+{
+    return input.shpos;
 }

@@ -52,11 +52,11 @@ float3 collide(float3 cpos, float3 xpos){
     float3 ret = float3(0, 0, 0);
 
     // repulsive force = direction * weight_from_distance
-    ret = dir * min(exp_max, 1000000 * exp2(collision_range - dist));      // exponential
+    ret = dir * min(exp_max, 1000 * exp2(collision_range - dist));      // exponential
     //ret = dir * min(exp_max, ((float)1000/collision_range)*(exp2((float)collision_range / dist)));     // hybrid
     //ret = dir * min(100000, 10 * (float)collision_range / dist);     // fractional
 
-    ret = dir * 1000000;
+    ret = dir * exp_max;
     return ret;
 }
 
@@ -100,7 +100,6 @@ float3 collision_detection(MassPoint old, uint objnum){
                         // not leaf level -> go below
                         if (i != maxlevel - 1){
                             // colliding parent box AND inside bounding box -> check children nodes
-                            // *TODO*: optimize axes
                             if (tree[j] && between(cpos.x, node.min_x, node.max_x) && between(cpos.y, node.min_x, node.max_y) && between(cpos.z, node.min_z, node.max_z)){
                                 tree[j * 2 + 1] = true;
                                 tree[j * 2 + 2] = true;
@@ -239,7 +238,7 @@ void CSMain1(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 
 		// Verlet + Acceleration
         if (old.newpos.y < table_pos && notstaticmass){				// table
-            accel += float3(0, min(exp_max, 1000 * exp2(-old.newpos.y)*exp_mul), 0);
+            accel += float3(0, min(exp_max, 1000 * exp2(abs(old.newpos.y - table_pos))*exp_mul), 0);    //old: min(exp_max, 1000 * exp2(-old.newpos.y)*exp_mul)
 		}
 		volcube1[ind].acc.xyz = accel;
         volcube1[ind].oldpos = old.newpos;
@@ -349,7 +348,7 @@ void CSMain2(uint3 Gid : SV_GroupID, uint3 DTid : SV_DispatchThreadID, uint3 GTi
 
 		// Verlet + Acceleration
         if (old.newpos.y < table_pos && notstaticmass){  // table
-            accel += float3(0, min(exp_max, 1000 * exp2(-old.newpos.y)*exp_mul), 0);
+            accel += float3(0, min(exp_max, 1000 * exp2(abs(old.newpos.y-table_pos))*exp_mul), 0);
 		}
 		volcube2[ind].acc.xyz = accel;
         volcube2[ind].oldpos = old.newpos;

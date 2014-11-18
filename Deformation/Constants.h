@@ -93,9 +93,10 @@ struct CB_GS
 {
     XMFLOAT4X4 worldViewProjection; // world-view-projection matrix
     XMFLOAT4X4 inverseView;         // inverse view matrix
+    XMFLOAT4X4 lightViewProjection; // light-view-projection matrix
     XMFLOAT4 eyePos;                // current eye position
-    VECTOR4 lightPos;              // current light position
-    VECTOR4 lightCol;              // current light colour
+    VECTOR4 lightPos;               // current light position
+    VECTOR4 lightCol;               // current light colour
 };
 
 struct CB_CS

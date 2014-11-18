@@ -88,7 +88,7 @@ void Deformable::importFile(){
         else if (line[0] == 'f'){
             // parse
             for (auto& s : parts){
-                f.push_back(atoi(s.c_str()));
+                f.push_back(atoi(s.substr(0,1).c_str()));
             }
             //store
             this->faces.push_back(f);

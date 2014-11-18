@@ -77,6 +77,7 @@ public:
         return true;
     }
 
+
     bool ShowDialog( WCHAR* pszInputText )
     {
         if ( !DXUTIsWindowed() )

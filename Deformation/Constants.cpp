@@ -15,7 +15,7 @@ std::atomic<float> spreadConstant = 400.0f;
 std::atomic<float> stiffnessConstant = 400.0f;
 std::atomic<float> dampingConstant = -3.0f;
 std::atomic<float> invMassConstant = 1.0f;
-std::atomic<float> collisionRangeConstant = 5.0f;
+std::atomic<float> collisionRangeConstant = 50.0f;
 std::atomic<float> gravityConstant = -1000.0f;
 std::atomic<float> tablePositionConstant = -1000.0f;
 std::atomic<VECTOR4> lightPos(VECTOR4{ 0, 0, -10000, 1 });
