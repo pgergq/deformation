@@ -64,6 +64,8 @@ ID3D11Buffer*                       masscube2Buffer1 = nullptr;
 ID3D11Buffer*                       masscube2Buffer2 = nullptr;
 ID3D11Buffer*                       particleBuffer1 = nullptr;
 ID3D11Buffer*                       particleBuffer2 = nullptr;
+ID3D11Buffer*                       particleIndexBuffer = nullptr;
+ID3D11InputLayout*                  particleIL = nullptr;
 ID3D11RenderTargetView*             pickingRTV1 = nullptr;
 ID3D11RenderTargetView*             pickingRTV2 = nullptr;
 ID3D11ShaderResourceView*           bvhCatalogueSRV1 = nullptr;
@@ -111,6 +113,7 @@ ID3D11VertexShader*                 shadowVS = nullptr;
 std::vector<Deformable>             deformableObjects;              // scene objects
 uint                                objectCount;                    // # of deformable bodies
 uint                                particleCount;                  // # of total vertex count
+uint                                indexCount;                     // # of total indices for the index buffer
 uint                                bvhPointCount;                  // # of total collision masspoints
 uint                                mass1Count;                     // #s of total masspoints
 uint                                mass2Count;
@@ -489,6 +492,7 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
             SAFE_RELEASE(masscube2Buffer2);
             SAFE_RELEASE(particleBuffer1);
             SAFE_RELEASE(particleBuffer2);
+            SAFE_RELEASE(particleIndexBuffer);
             SAFE_RELEASE(bvhCatalogueSRV1);
             SAFE_RELEASE(bvhCatalogueSRV2);
             SAFE_RELEASE(bvhDataSRV1);
@@ -510,6 +514,7 @@ void CALLBACK OnKeyboard(UINT nChar, bool bKeyDown, bool bAltDown, void* pUserCo
             SAFE_RELEASE(masscube2UAV2);
             SAFE_RELEASE(particleUAV1);
             SAFE_RELEASE(particleUAV2);
+            SAFE_RELEASE(particleIL);
             initBuffers(DXUTGetD3D11Device());
             break;
         }
@@ -639,12 +644,30 @@ HRESULT initShaders(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediate
     V_RETURN(pd3dDevice->CreateComputeShader(pBlobUpdateCS->GetBufferPointer(), pBlobUpdateCS->GetBufferSize(), nullptr, &updateCS));
     DXUT_SetDebugName(updateCS, "PosUpdate");
 
-    // No vertex buffer necessary, particle data is read from an SRV
-    pd3dImmediateContext->IASetInputLayout(nullptr);
-    ID3D11Buffer* pBuffers[1] = { nullptr };
+    /// Masspoint display
+    //// No vertex buffer necessary, particle data is read from an SRV
+    //pd3dImmediateContext->IASetInputLayout(nullptr);
+    //ID3D11Buffer* pBuffers[1] = { nullptr };
+    //UINT tmp[1] = { 0 };
+    //pd3dImmediateContext->IASetVertexBuffers(0, 1, pBuffers, tmp, tmp);
+    //pd3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+
+    /// Body display
+    // create vertex input layout
+    const D3D11_INPUT_ELEMENT_DESC layout[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "MPIDONE", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 32, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "MPIDTWO", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 48, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+    };
+    V_RETURN(pd3dDevice->CreateInputLayout(layout, sizeof(layout) / sizeof(layout[0]), pBlobRenderParticlesVS->GetBufferPointer(), pBlobRenderParticlesVS->GetBufferSize(), &particleIL));
+    DXUT_SetDebugName(particleIL, "Particle InputLayout");
+    pd3dImmediateContext->IASetInputLayout(particleIL);
+    ID3D11Buffer* pBuffers[1] = { particleBuffer1 };
     UINT tmp[1] = { 0 };
     pd3dImmediateContext->IASetVertexBuffers(0, 1, pBuffers, tmp, tmp);
-    pd3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+    pd3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // Release blobs
     SAFE_RELEASE(pBlobRenderParticlesVS);
@@ -653,7 +676,7 @@ HRESULT initShaders(ID3D11Device* pd3dDevice, ID3D11DeviceContext* pd3dImmediate
     SAFE_RELEASE(pBlobModelPS1);
     SAFE_RELEASE(pBlobModelPS2);
     SAFE_RELEASE(pBlobShadowVS);
-    //SAFE_RELEASE(pBlobShadowPS);
+    SAFE_RELEASE(shadowPS);
     SAFE_RELEASE(pBlobBVHCS);
     SAFE_RELEASE(pBlobCalc1CS);
     SAFE_RELEASE(pBlobCalc2CS);
@@ -961,6 +984,47 @@ HRESULT initBuffers(ID3D11Device* pd3dDevice)
     V_RETURN(pd3dDevice->CreateUnorderedAccessView(bvhDataBuffer2, &bddescUAV, &bvhDataUAV2));
     DXUT_SetDebugName(bvhDataUAV1, "BVHData UAV1");
     DXUT_SetDebugName(bvhDataUAV2, "BVHData UAV2");
+
+
+    /// Index buffer
+    // Array for indices
+    for (uint i = 0; i < objectCount; i++)
+    {
+        indexCount += deformableObjects[i].faceCount * 3;
+    }
+    uint* indices = new uint[indexCount];
+    if (!indices) return E_OUTOFMEMORY;
+    uint ii = 0;
+    uint offs = 0;
+    for (uint i = 0; i < objectCount; i++)
+    {
+        for (uint j = 0; j < deformableObjects[i].faceCount; j++)
+        {
+            indices[ii++] = deformableObjects[i].faces[j][1] + offs - 1;
+            indices[ii++] = deformableObjects[i].faces[j][2] + offs - 1;
+            indices[ii++] = deformableObjects[i].faces[j][3] + offs - 1;
+        }
+        offs += deformableObjects[i].vertexCount;
+    }
+
+    // Create index buffer
+    D3D11_BUFFER_DESC iidesc;
+    ZeroMemory(&iidesc, sizeof(iidesc));
+    iidesc.Usage = D3D11_USAGE_DEFAULT;
+    iidesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    iidesc.ByteWidth = sizeof(uint) * indexCount * 3;
+    iidesc.MiscFlags = 0;
+    iidesc.CPUAccessFlags = 0;
+
+    D3D11_SUBRESOURCE_DATA IndexData;
+    IndexData.pSysMem = indices;
+    IndexData.SysMemPitch = 0;
+    IndexData.SysMemSlicePitch = 0;
+
+    // Create the buffer with the device.
+    V_RETURN(pd3dDevice->CreateBuffer(&iidesc, &IndexData, &particleIndexBuffer));
+    DXUT_SetDebugName(particleIndexBuffer, "ParticleIndexBuffer");
+    SAFE_DELETE_ARRAY(indices);
 
     return hr;
 }
@@ -1310,7 +1374,9 @@ bool drawObjects(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
     pd3dImmediateContext->OMSetBlendState(blendState, bf, 0xFFFFFFFF);
     pd3dImmediateContext->OMSetDepthStencilState(depthStencilState, 0);
 
-    pd3dImmediateContext->Draw(particleCount, 0);
+    //masspoint drawer: pd3dImmediateContext->Draw(particleCount, 0);
+    pd3dImmediateContext->IASetIndexBuffer(particleIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
+    pd3dImmediateContext->DrawIndexed(indexCount, 0, 0);
 
     ID3D11ShaderResourceView* ppSRVNULL[1] = { nullptr };
     pd3dImmediateContext->VSSetShaderResources(0, 1, ppSRVNULL);
@@ -1428,7 +1494,7 @@ void CALLBACK OnD3D11FrameRender(ID3D11Device* pd3dDevice, ID3D11DeviceContext* 
 //--------------------------------------------------------------------------------------
 void CALLBACK OnD3D11DestroyDevice(void* pUserContext)
 {
-    DXUTGetGlobalResourceCache().OnDestroyDevice();
+    
     SAFE_RELEASE(blendState);
     SAFE_RELEASE(depthStencilState);
     SAFE_RELEASE(samplerState);
@@ -1449,6 +1515,7 @@ void CALLBACK OnD3D11DestroyDevice(void* pUserContext)
     SAFE_RELEASE(masscube2Buffer2);
     SAFE_RELEASE(particleBuffer1);
     SAFE_RELEASE(particleBuffer2);
+    SAFE_RELEASE(particleIndexBuffer);
     SAFE_RELEASE(pickingRTV1);
     SAFE_RELEASE(pickingRTV2);
     SAFE_RELEASE(bvhCatalogueSRV1);
@@ -1485,6 +1552,8 @@ void CALLBACK OnD3D11DestroyDevice(void* pUserContext)
     SAFE_RELEASE(pickingPS1);
     SAFE_RELEASE(pickingPS2);
     SAFE_RELEASE(shadowPS);
+    SAFE_RELEASE(shadowVS);
     SAFE_RELEASE(renderVS);
+    SAFE_RELEASE(particleIL);
     
 }

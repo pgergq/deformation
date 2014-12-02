@@ -11,10 +11,10 @@
 
 struct VSParticle
 {
-	float4 pos			: WPOS;
-	float4 npos			: NPOS;
-	float4 mpid1		: MPID1;
-	float4 mpid2		: MPID2;
+	float4 pos			: POSITION;
+	float4 npos			: NORMAL;
+	float4 mpid1		: MPIDONE;
+	float4 mpid2		: MPIDTWO;
 };
 
 struct ShadowPos
@@ -25,8 +25,8 @@ struct ShadowPos
 struct GSParticleDrawOut
 {
 	float2 tex			: TEXCOORD0;
-	float3 mpid1		: MPID1;
-	float3 mpid2		: MPID2;
+	float3 mpid1		: MPIDONE;
+	float3 mpid2		: MPIDTWO;
 	float4 color		: COLOR;
     float4 shpos        : SHPOS;
 	float4 pos			: SV_Position;
@@ -35,8 +35,8 @@ struct GSParticleDrawOut
 struct PSParticleDrawIn
 {
 	float2 tex			: TEXCOORD0;
-	float3 mpid1		: MPID1;
-	float3 mpid2		: MPID2;
+	float3 mpid1		: MPIDONE;
+	float3 mpid2		: MPIDTWO;
 	float4 color		: COLOR;
     float4 shpos        : SHPOS;
 };
@@ -102,21 +102,21 @@ float4 PhongBlinn(float3 n, float3 h, float3 l){
 //
 VSParticle VSParticleDraw(uint id : SV_VertexID)
 {
-	VSParticle output;
+    VSParticle output;
 
-	output.pos = g_bufParticle[id].pos;
-	output.npos = g_bufParticle[id].npos;
-	output.mpid1 = g_bufParticle[id].mpid1;
-	output.mpid2 = g_bufParticle[id].mpid2;
+    output.pos = g_bufParticle[id].pos;
+    output.npos = g_bufParticle[id].npos;
+    output.mpid1 = g_bufParticle[id].mpid1;
+    output.mpid2 = g_bufParticle[id].mpid2;
 
-	return output;
+    return output;
 }
 
 //
 // GS for rendering point sprite particles.  Takes a point and turns it into 2 tris.
 //
-[maxvertexcount(4)]
-void GSParticleDraw(point VSParticle input[1], inout TriangleStream<GSParticleDrawOut> SpriteStream)
+[maxvertexcount(3)]
+void GSParticleDraw(triangle VSParticle input[3], inout TriangleStream<GSParticleDrawOut> SpriteStream)
 {
 
 	GSParticleDrawOut output;
@@ -125,18 +125,18 @@ void GSParticleDraw(point VSParticle input[1], inout TriangleStream<GSParticleDr
 	float3 n = normalize(input[0].npos.xyz - input[0].pos.xyz);		// vertex normal
 	float3 l = normalize(lightpos.xyz);								// opposite of light direction (light: lightpos -> origo)
 
-	for (int i = 0; i<4; i++)
+	for (int i = 0; i<3; i++)
 	{
 
 		//vertex -> two triangles
-		float3 position = g_positions[i] * g_fParticleRad * 2.5f;
-		position = mul(position, (float3x3)g_mInvView) + input[0].pos.xyz;	// world position
-		output.pos = mul(float4(position, 1.0), g_mWorldViewProj);
+		//float3 position = g_positions[i] * g_fParticleRad * 2.5f;
+		//position = mul(position, (float3x3)g_mInvView) + input[0].pos.xyz;	// world position
+        output.pos = mul(input[i].pos, g_mWorldViewProj);
 		
 		//shading
-		float3 v = normalize(eyepos.xyz - input[0].pos.xyz);
+		float3 v = normalize(eyepos.xyz - input[i].pos.xyz);
 		float3 h = normalize(v + l);
-		if (any(input[0].npos.xyz)){								// not null vector normal = model vertices
+		if (any(input[i].npos.xyz)){								// not null vector normal = model vertices
 			output.color = PhongBlinn(n, h, l);
 		}
 		else{														// null normal -> other vertices
@@ -145,10 +145,10 @@ void GSParticleDraw(point VSParticle input[1], inout TriangleStream<GSParticleDr
 
 		//texture and vertex IDs
 		output.tex = g_texcoords[i];
-		output.mpid1 = input[0].mpid1.xyz;
-		output.mpid2 = input[0].mpid2.xyz;
+		output.mpid1 = input[i].mpid1.xyz;
+		output.mpid2 = input[i].mpid2.xyz;
         //shadow data
-        output.shpos = mul(float4(position, 1.0), g_mLightViewProj);
+        output.shpos = mul(input[i].pos, g_mLightViewProj);
 		SpriteStream.Append(output);
 	}
 	SpriteStream.RestartStrip();
@@ -159,7 +159,7 @@ void GSParticleDraw(point VSParticle input[1], inout TriangleStream<GSParticleDr
 //
 float4 PSParticleDraw(PSParticleDrawIn input) : SV_Target
 {
-	return g_txDiffuse.Sample(g_samLinear, input.tex) * input.color;
+    return input.color;
 }
 
 //

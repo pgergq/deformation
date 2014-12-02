@@ -56,7 +56,6 @@ float3 collide(float3 cpos, float3 xpos){
     //ret = dir * min(exp_max, ((float)1000/collision_range)*(exp2((float)collision_range / dist)));     // hybrid
     //ret = dir * min(100000, 10 * (float)collision_range / dist);     // fractional
 
-    ret = dir * exp_max;
     return ret;
 }
 
@@ -85,47 +84,56 @@ float3 collision_detection(MassPoint old, uint objnum){
 
         // collision with another object
         else {
-
+            // check for collision
             if (between(cpos.x, colldesc.min_x, colldesc.max_x) && between(cpos.y, colldesc.min_y, colldesc.max_y) && between(cpos.z, colldesc.min_z, colldesc.max_z))
             {
                 // collision with the other object, compute forces (traverse tree)
-                bool tree[1024];    // *TODO*: dynamic stack
-                tree[0] = tree[1] = tree[2] = true;
+                uint stack[32];
+                stack[0] = 0;
+                uint stacks = 1;
                 uint maxlevel = log2(colldesc.masspoint_count + 1);
-                for (uint i = 1; i < maxlevel; i++){                                    // i = level number, root level already checked (collision)
-                    uint leveloffset = exp2(i) - 1;                                     // first node index of current level
 
-                    for (uint j = leveloffset; j < leveloffset * 2 + 1; j++){           // j = node index int the whole tree (for every node on the current level)
-                        BVBox node = bvhdata[arr_off + j];                              // arr_off + j = node index in bvhdata[]
-                        // not leaf level -> go below
-                        if (i != maxlevel - 1){
-                            // colliding parent box AND inside bounding box -> check children nodes
-                            if (tree[j] && between(cpos.x, node.min_x, node.max_x) && between(cpos.y, node.min_x, node.max_y) && between(cpos.z, node.min_z, node.max_z)){
-                                tree[j * 2 + 1] = true;
-                                tree[j * 2 + 2] = true;
-                            }
-                            else {
-                                tree[j * 2 + 1] = false;
-                                tree[j * 2 + 2] = false;
-                            }
+                // DFS in collision tree (max size: 2^32 tree)
+                while (stacks > 0){
+                    // get node index to check
+                    stacks--;
+                    uint index = stack[stacks];
+                    uint level = log2(index + 1);   // level index (0..n-1)
+
+                    // leaf level, bvboxes with two leaf-children
+                    if (level == maxlevel - 1){
+                        BVBox node = bvhdata[arr_off + index];
+                        // collide left leaf
+                        if (node.left_type==1){
+                            accel += collide(cpos.xyz, ovolcube1[o * cube_width * cube_width * cube_width + node.left_id].newpos.xyz);
                         }
-                        // leaf level -> calculate force
-                        // cpos = current masspoint, xpos = colliding masspoint
-                        else {
-                            if (tree[j] && node.left_type != -1){                        // valid left leaf, calculate force
-                                float4 xpos = (node.left_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.left_id].newpos
-                                    : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.left_id].newpos;
-                                // collision
-                                accel += collide(cpos.xyz, xpos.xyz);
-                            }
-                            if (tree[j] && node.right_type != -1){                       // valid right leaf, calculate force
-                                float4 xpos = (node.right_type == 1) ? ovolcube1[o*cube_width*cube_width*cube_width + node.right_id].newpos
-                                    : ovolcube2[o*(cube_width + 1)*(cube_width + 1)*(cube_width + 1) + node.right_id].newpos;
-                                // collision
-                                accel += collide(cpos.xyz, xpos.xyz);
-                            }
+                        else if (node.left_type==2){
+                            accel += collide(cpos.xyz, ovolcube2[o * (cube_width + 1) * (cube_width + 1) * (cube_width + 1) + node.left_id].newpos.xyz);
+                        }
+                        // collide right leaf
+                        if (node.right_type==1){
+                            accel += collide(cpos.xyz, ovolcube1[o * cube_width * cube_width * cube_width + node.right_id].newpos.xyz);
+                        }
+                        else if (node.right_type==2){
+                            accel += collide(cpos.xyz, ovolcube2[o * (cube_width + 1) * (cube_width + 1) * (cube_width + 1) + node.right_id].newpos.xyz);
                         }
                     }
+                    // node level, check children
+                    else {
+                        BVBox lnode = bvhdata[arr_off + index * 2 + 1];
+                        BVBox rnode = bvhdata[arr_off + index * 2 + 2];
+                        // colliding right children
+                        if (between(cpos.x, rnode.min_x, rnode.max_x) && between(cpos.y, rnode.min_x, rnode.max_y) && between(cpos.z, rnode.min_z, rnode.max_z)){
+                            stack[stacks] = index * 2 + 2;
+                            stacks++;
+                        }
+                        // colliding left children
+                        if (between(cpos.x, lnode.min_x, lnode.max_x) && between(cpos.y, lnode.min_x, lnode.max_y) && between(cpos.z, lnode.min_z, lnode.max_z)){
+                            stack[stacks] = index * 2 + 1;
+                            stacks++;
+                        }
+                    }
+
                 }
             }
         }
