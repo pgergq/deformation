@@ -84,6 +84,12 @@ struct Indexer
     float nw2[8];           //			--||--
 };
 
+// face structure
+struct Face
+{
+    uint4 vertices;         // face vertices
+};
+
 // BVHData entry (bounding box)
 struct BVBox {
     int left_id;            // masspoint ID of left child (-1: not leaf), index in masscube!

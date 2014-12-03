@@ -151,6 +151,11 @@ struct INDEXER
     float nw2[8];                   // normal weights of the second volcube neighbours
 };
 
+struct FACE
+{
+    XMUINT4 vertices;               // 3 vertex for object faces
+};
+
 /// Structure representing BVBox data
 /// isLeaf -> the box contains 2 masspoints with given bounding box (<-- valid ID(s))
 struct BVBOX {
