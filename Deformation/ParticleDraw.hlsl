@@ -9,7 +9,11 @@
 //--------------------------------------------------------------------------------------
 
 
-struct VSParticle
+//--------------------------------------------------------------------------------------
+// DEFINITIONS
+//--------------------------------------------------------------------------------------
+
+struct BufferVertex
 {
     float4 pos			: WPOS;
     float4 npos			: NPOS;
@@ -17,9 +21,10 @@ struct VSParticle
     float4 mpid2		: MPIDTWO;
 };
 
-struct ShadowPos
+struct ObjectVertex
 {
     float4 pos          : SV_Position;
+    float4 color        : COLOR;
 };
 
 struct Face
@@ -27,28 +32,23 @@ struct Face
     uint4 vertices      : FACEVERTS;
 };
 
-struct GSParticleDrawOut
+struct PickingVertex
 {
-    float2 tex			: TEXCOORD0;
-    float3 mpid1		: MPIDONE;
-    float3 mpid2		: MPIDTWO;
-    float4 color		: COLOR;
-    float4 shpos        : SHPOS;
-    float4 pos			: SV_Position;
+    float4 pos          : SV_Position;
+    float3 mpid1        : MPIDONE;
+    float3 mpid2        : MPIDTWO;
 };
 
-struct PSParticleDrawIn
+struct ShadowVertex
 {
-    float2 tex			: TEXCOORD0;
-    float3 mpid1		: MPIDONE;
-    float3 mpid2		: MPIDTWO;
-    float4 color		: COLOR;
-    float4 shpos        : SHPOS;
+    float4 pos          : SV_Position;
 };
+
 
 Texture2D g_txDiffuse;
-StructuredBuffer<VSParticle> g_bufParticle : register(t0);
+StructuredBuffer<BufferVertex> g_bufParticle : register(t0);
 StructuredBuffer<Face>  g_bufFace : register(t1);
+//Texture2D<float> g_txShadowMap : register(t2);
 
 
 SamplerState g_samLinear
@@ -90,97 +90,79 @@ cbuffer cbImmutable
         float2(0, 1),
         float2(1, 1),
     };
+
+    static float4 g_table[4] = 
+    {
+        float4(-10000, -1000, -10000, 1),
+        float4(-10000, -1000, 10000, 1),
+        float4(10000, -1000, 10000, 1),
+        float4(10000, -1000, -10000, 1)
+    };
 };
 
-//
-// Phong-Blinn, ruby
-//
-float4 PhongBlinn(float3 n, float3 h, float3 l){
-    float4 ka = float4(0.1745, 0.01175, 0.01175, 0.55);
-    float4 kd = float4(0.61424, 0.04136, 0.04136, 0.55);
-    float4 ks = float4(0.727811, 0.626959, 0.626959, 0.55);
-    float shininess = 76.8;
-    return (ka + kd * saturate(dot(n, l)) + ks * pow(saturate(dot(n, h)), shininess)) * lightcol;
-}
+
+//--------------------------------------------------------------------------------------
+// OBJECT RENDERING
+//--------------------------------------------------------------------------------------
 
 //
-// Vertex shader for drawing the point-sprite particles (masspoint drawing)
+// Blinn-Phong shading, árány
 //
-//VSParticle VSParticleDraw(uint id : SV_VertexID)
-//{
-//    VSParticle output;
-//
-//    output.pos = g_bufParticle[id].pos;
-//    output.npos = g_bufParticle[id].npos;
-//    output.mpid1 = g_bufParticle[id].mpid1;
-//    output.mpid2 = g_bufParticle[id].mpid2;
-//
-//    return output;
-//}
+float4 BlinnPhong(float3 P, float3 N)
+{
+    float4 ka = float4(0.24725, 0.1995, 0.0745, 1);
+    float4 kd = float4(0.75164, 0.60648, 0.22648, 1);
+    float4 ks = float4(0.628281, 0.555802, 0.366065, 1);
+    float shininess = 80;
+    float3 L = normalize(lightpos.xyz - P);
+    float3 V = normalize(eyepos.xyz - P);
+    float3 H = normalize(L + V);
+    float3 diffuse = max(0, saturate(dot(L, N)));
+    float3 spec = pow(saturate(dot(N, H)), shininess);
+    return ka + kd * float4(diffuse, 1) + ks * float4(spec, 1);
+}
 
 //
 // Vertex shader for drawing the point-sprite particles (object drawing)
 //
-Face VSParticleDraw(uint id : SV_VertexID)
+Face VSObjectDraw(uint id : SV_VertexID)
 {
     return g_bufFace[id];
 }
 
 //
-// GS for rendering point sprite particles.  Takes a point and turns it into 2 tris. (masspoint drawing)
-//
-//[maxvertexcount(4)]
-//void GSParticleDraw(point VSParticle input[1], inout TriangleStream<GSParticleDrawOut> SpriteStream)
-//{
-//
-//    GSParticleDrawOut output;
-//
-//    //calculate lighting data
-//    float3 n = normalize(input[0].npos.xyz - input[0].pos.xyz);		// vertex normal
-//        float3 l = normalize(lightpos.xyz);								// opposite of light direction (light: lightpos -> origo)
-//
-//        for (int i = 0; i<4; i++)
-//        {
-//
-//            //vertex -> two triangles
-//            float3 position = g_positions[i] * g_fParticleRad * 2.5f;
-//                position = mul(position, (float3x3)g_mInvView) + input[0].pos.xyz;	// world position
-//            output.pos = mul(float4(position, 1.0), g_mWorldViewProj);
-//
-//            //shading
-//            float3 v = normalize(eyepos.xyz - input[0].pos.xyz);
-//                float3 h = normalize(v + l);
-//                if (any(input[0].npos.xyz)){								// not null vector normal = model vertices
-//                    output.color = PhongBlinn(n, h, l);
-//                }
-//                else{														// null normal -> other vertices
-//                    output.color = float4(1, 0, 0, 0);
-//                }
-//
-//                //texture and vertex IDs
-//                output.tex = g_texcoords[i];
-//                output.mpid1 = input[0].mpid1.xyz;
-//                output.mpid2 = input[0].mpid2.xyz;
-//                //shadow data
-//                output.shpos = mul(float4(position, 1.0), g_mLightViewProj);
-//                SpriteStream.Append(output);
-//        }
-//    SpriteStream.RestartStrip();
-//}
-
-//
 // GS for rendering point sprite particles.  Takes a point and turns it into 2 tris. (object drawing)
 //
-[maxvertexcount(3)]
-void GSParticleDraw(point Face input[1], inout TriangleStream<GSParticleDrawOut> SpriteStream)
+[maxvertexcount(6)]
+void GSObjectDraw(uint id : SV_PrimitiveID, point Face input[1], inout TriangleStream<ObjectVertex> SpriteStream)
 {
-
-    GSParticleDrawOut output;
+    ObjectVertex output;
     uint points[3] = { input[0].vertices.x, input[0].vertices.y, input[0].vertices.z };
 
+    //table draw
+    if (id == 0){
+        output.color = float4(0.7f, 0.7f, 0.7f, 1);
+        // first half
+        output.pos = mul(g_table[0], g_mWorldViewProj);
+        SpriteStream.Append(output);
+        output.pos = mul(g_table[1], g_mWorldViewProj);
+        SpriteStream.Append(output);
+        output.pos = mul(g_table[2], g_mWorldViewProj);
+        SpriteStream.Append(output);
+        SpriteStream.RestartStrip();
+        // second half
+        output.pos = mul(g_table[0], g_mWorldViewProj);
+        SpriteStream.Append(output);
+        output.pos = mul(g_table[2], g_mWorldViewProj);
+        SpriteStream.Append(output);
+        output.pos = mul(g_table[3], g_mWorldViewProj);
+        SpriteStream.Append(output);
+    }
+
+    // draw object face
     for (int i = 0; i<3; i++)
     {
-        VSParticle vertex = g_bufParticle[points[2-i]];
+        BufferVertex vertex = g_bufParticle[points[2 - i]];
         output.pos = mul(vertex.pos, g_mWorldViewProj);
 
         //calculate lighting data
@@ -191,18 +173,12 @@ void GSParticleDraw(point Face input[1], inout TriangleStream<GSParticleDrawOut>
         float3 v = normalize(eyepos.xyz - vertex.pos.xyz);
         float3 h = normalize(v + l);
         if (any(vertex.npos.xyz)){								    // not null vector normal = model vertices
-            output.color = PhongBlinn(n, h, l);
+            output.color = BlinnPhong(vertex.pos.xyz, n);
         }
         else{														// null normal -> other vertices
             output.color = float4(1, 0, 0, 0);
         }
 
-        //texture and vertex IDs
-        output.tex = g_texcoords[i];
-        output.mpid1 = vertex.mpid1.xyz;
-        output.mpid2 = vertex.mpid2.xyz;
-        //shadow data
-        output.shpos = mul(vertex.pos, g_mLightViewProj);
         SpriteStream.Append(output);
     }
     SpriteStream.RestartStrip();
@@ -211,15 +187,59 @@ void GSParticleDraw(point Face input[1], inout TriangleStream<GSParticleDrawOut>
 //
 // PS for drawing particles
 //
-float4 PSParticleDraw(PSParticleDrawIn input) : SV_Target
+float4 PSObjectDraw(ObjectVertex input) : SV_Target
 {
-    return g_txDiffuse.Sample(g_samLinear, input.tex) * input.color;
+    return input.color;
+}
+
+
+//--------------------------------------------------------------------------------------
+// PICKING
+//--------------------------------------------------------------------------------------
+
+//
+// Vertex shader for drawing the point-sprite particles (masspoint drawing)
+//
+PickingVertex VSPickingDraw(uint id : SV_VertexID)
+{
+    PickingVertex output;
+
+    output.pos = g_bufParticle[id].pos;
+    output.mpid1 = g_bufParticle[id].mpid1.xyz;
+    output.mpid2 = g_bufParticle[id].mpid2.xyz;
+
+    return output;
+}
+
+//
+// GS for rendering point sprite particles.  Takes a point and turns it into 2 tris. (masspoint drawing)
+//
+[maxvertexcount(4)]
+void GSPickingDraw(point PickingVertex input[1], inout TriangleStream<PickingVertex> SpriteStream)
+{
+
+    PickingVertex output;
+
+    for (int i = 0; i<4; i++){
+
+        // position
+        float3 position = g_positions[i] * g_fParticleRad * 2.5f;
+        position = mul(position, (float3x3)g_mInvView) + input[0].pos.xyz;	// world position
+        output.pos = mul(float4(position, 1.0), g_mWorldViewProj);
+
+        // vertex IDs
+        output.mpid1 = input[0].mpid1.xyz;
+        output.mpid2 = input[0].mpid2.xyz;
+
+        SpriteStream.Append(output);
+    }
+    SpriteStream.RestartStrip();
 }
 
 //
 // PS for drawing model (picking)
 //
-float4 PSModelDraw1(PSParticleDrawIn input) : SV_Target
+float4 PSPickingDraw1(PickingVertex input) : SV_Target
 {
     return float4(input.mpid1, 1.0f);
 }
@@ -227,19 +247,55 @@ float4 PSModelDraw1(PSParticleDrawIn input) : SV_Target
 //
 // PS for drawing model (picking)
 //
-float4 PSModelDraw2(PSParticleDrawIn input) : SV_Target
+float4 PSPickingDraw2(PickingVertex input) : SV_Target
 {
     return float4(input.mpid2, 1.0f);
 }
 
-////////// Shadow mapping
+
+//--------------------------------------------------------------------------------------
+// SHADOW MAPPING
+//--------------------------------------------------------------------------------------
 
 //
-// Shadow VS
+// GS for shadow mapping
 //
-ShadowPos VSShadow(uint id : SV_VertexID)
+[maxvertexcount(6)]
+void GSShadowDraw(uint id : SV_PrimitiveID, point Face input[1], inout TriangleStream<ShadowVertex> SpriteStream)
 {
-    ShadowPos output;
-    output.pos = mul(g_bufParticle[id].pos, g_mLightViewProj);
-    return output;
+    ShadowVertex output;
+    uint points[3] = { input[0].vertices.x, input[0].vertices.y, input[0].vertices.z };
+
+    //table draw
+    if (id == 0){
+        // first half
+        output.pos = mul(g_table[0], g_mLightViewProj);
+        SpriteStream.Append(output);
+        output.pos = mul(g_table[1], g_mLightViewProj);
+        SpriteStream.Append(output);
+        output.pos = mul(g_table[2], g_mLightViewProj);
+        SpriteStream.Append(output);
+        SpriteStream.RestartStrip();
+        // second half
+        output.pos = mul(g_table[0], g_mLightViewProj);
+        SpriteStream.Append(output);
+        output.pos = mul(g_table[2], g_mLightViewProj);
+        SpriteStream.Append(output);
+        output.pos = mul(g_table[3], g_mLightViewProj);
+        SpriteStream.Append(output);
+    }
+
+    // draw object face
+    for (int i = 0; i<3; i++)
+    {
+        BufferVertex vertex = g_bufParticle[points[2 - i]];
+        output.pos = mul(vertex.pos, g_mLightViewProj);
+        SpriteStream.Append(output);
+    }
+    SpriteStream.RestartStrip();
 }
+
+//
+// PS for shadow mapping
+//
+void PSShadowDraw(ShadowVertex input){}
