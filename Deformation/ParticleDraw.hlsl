@@ -24,6 +24,7 @@ struct BufferVertex
 struct ObjectVertex
 {
     float4 pos          : SV_Position;
+    float4 lpos         : TEXCOORD0;
     float4 color        : COLOR;
 };
 
@@ -48,7 +49,7 @@ struct ShadowVertex
 Texture2D g_txDiffuse;
 StructuredBuffer<BufferVertex> g_bufParticle : register(t0);
 StructuredBuffer<Face>  g_bufFace : register(t1);
-//Texture2D<float> g_txShadowMap : register(t2);
+Texture2D<float> g_txShadowMap : register(t2);
 
 
 SamplerState g_samLinear
@@ -56,6 +57,20 @@ SamplerState g_samLinear
     Filter = MIN_MAG_MIP_LINEAR;
     AddressU = Clamp;
     AddressV = Clamp;
+};
+
+SamplerState g_samBilinear
+{
+    Filter = MIN_MAG_MIP_LINEAR;
+    AddressU = MIRROR;
+    AddressV = MIRROR;
+};
+
+SamplerState g_samPoint
+{
+    Filter = MIN_MAG_MIP_LINEAR;
+    AddressU = MIRROR;
+    AddressV = MIRROR;
 };
 
 cbuffer cb0
@@ -110,10 +125,18 @@ cbuffer cbImmutable
 //
 float4 BlinnPhong(float3 P, float3 N)
 {
-    float4 ka = float4(0.24725, 0.1995, 0.0745, 1);
-    float4 kd = float4(0.75164, 0.60648, 0.22648, 1);
-    float4 ks = float4(0.628281, 0.555802, 0.366065, 1);
-    float shininess = 80;
+    // árány
+    //float4 ka = float4(0.24725, 0.1995, 0.0745, 1);
+    //float4 kd = float4(0.75164, 0.60648, 0.22648, 1);
+    //float4 ks = float4(0.628281, 0.555802, 0.366065, 1);
+    //float shininess = 80;
+
+    // türkiz
+    float4 ka = float4(0.1, 0.18725, 0.1745, 1);
+    float4 kd = float4(0.096, 0.94151, 0.09102, 1);
+    float4 ks = float4(0.297254, 0.30829, 0.306678, 1);
+    float shininess = 20;
+    
     float3 L = normalize(lightpos.xyz - P);
     float3 V = normalize(eyepos.xyz - P);
     float3 H = normalize(L + V);
@@ -144,18 +167,24 @@ void GSObjectDraw(uint id : SV_PrimitiveID, point Face input[1], inout TriangleS
         output.color = float4(0.7f, 0.7f, 0.7f, 1);
         // first half
         output.pos = mul(g_table[0], g_mWorldViewProj);
+        output.lpos = mul(g_table[0], g_mLightViewProj);
         SpriteStream.Append(output);
         output.pos = mul(g_table[1], g_mWorldViewProj);
+        output.lpos = mul(g_table[1], g_mLightViewProj);
         SpriteStream.Append(output);
         output.pos = mul(g_table[2], g_mWorldViewProj);
+        output.lpos = mul(g_table[2], g_mLightViewProj);
         SpriteStream.Append(output);
         SpriteStream.RestartStrip();
         // second half
         output.pos = mul(g_table[0], g_mWorldViewProj);
+        output.lpos = mul(g_table[0], g_mLightViewProj);
         SpriteStream.Append(output);
         output.pos = mul(g_table[2], g_mWorldViewProj);
+        output.lpos = mul(g_table[2], g_mLightViewProj);
         SpriteStream.Append(output);
         output.pos = mul(g_table[3], g_mWorldViewProj);
+        output.lpos = mul(g_table[3], g_mLightViewProj);
         SpriteStream.Append(output);
     }
 
@@ -164,6 +193,7 @@ void GSObjectDraw(uint id : SV_PrimitiveID, point Face input[1], inout TriangleS
     {
         BufferVertex vertex = g_bufParticle[points[2 - i]];
         output.pos = mul(vertex.pos, g_mWorldViewProj);
+        output.lpos = mul(vertex.pos, g_mLightViewProj);
 
         //calculate lighting data
         float3 n = normalize(vertex.npos.xyz - vertex.pos.xyz);		// vertex normal
@@ -189,7 +219,33 @@ void GSObjectDraw(uint id : SV_PrimitiveID, point Face input[1], inout TriangleS
 //
 float4 PSObjectDraw(ObjectVertex input) : SV_Target
 {
-    return input.color;
+
+    // shadow mapping:
+    float4 ka = float4(0.1, 0.18725, 0.1745, 1);
+
+    // to homogenous
+    input.lpos.xyz /= input.lpos.w;
+
+    // out of bounds: not visible
+    if (input.lpos.x < -1.0f || input.lpos.x > 1.0f || input.lpos.y < -1.0f || input.lpos.y > 1.0f || input.lpos.z <  0.0f || input.lpos.z > 1.0f)
+        return ka;
+
+    // convert to texture coordinates
+    input.lpos.x = input.lpos.x * 0.5f + 0.5;
+    input.lpos.y = input.lpos.y * (-0.5f) + 0.5;
+
+    // sample texture
+    float depth = g_txShadowMap.Sample(g_samLinear, input.lpos.xy).r;
+
+    // decide if in shadow: shadow map depth is less than fragment depth
+    if (depth < input.lpos.z){
+        return ka;
+    }
+    else
+    {
+        return input.color;
+    }
+
 }
 
 

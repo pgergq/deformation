@@ -1213,19 +1213,18 @@ HRESULT initShadow(ID3D11Device* pd3dDevice, int width, int height)
     //pd3dDevice->CreateShaderResourceView(shadowTexture, &shaderResourceViewDesc, &shadowSRV);
     //DXUT_SetDebugName(shadowSRV, "Shadow SRV");
 
-
+    // create depth texture
     auto settings = DXUTGetDeviceSettings();
     D3D11_TEXTURE2D_DESC descDepth;
     descDepth.Width = width;
     descDepth.Height = height;
     descDepth.MipLevels = 1;
     descDepth.ArraySize = 1;
-    //descDepth.Format = settings.d3d11.AutoDepthStencilFormat;
     descDepth.Format = DXGI_FORMAT_R32_TYPELESS;
     descDepth.SampleDesc.Count = settings.d3d11.sd.SampleDesc.Count;
     descDepth.SampleDesc.Quality = settings.d3d11.sd.SampleDesc.Quality;
     descDepth.Usage = D3D11_USAGE_DEFAULT;
-    descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+    descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
     descDepth.CPUAccessFlags = 0;
     descDepth.MiscFlags = 0;
     pd3dDevice->CreateTexture2D(&descDepth, nullptr, &shadowTexture);
@@ -1233,7 +1232,6 @@ HRESULT initShadow(ID3D11Device* pd3dDevice, int width, int height)
 
     // Create the depth stencil view
     D3D11_DEPTH_STENCIL_VIEW_DESC descDSV;
-    //descDSV.Format = descDepth.Format;
     descDSV.Format = DXGI_FORMAT_D32_FLOAT;
     descDSV.Flags = 0;
     if (descDepth.SampleDesc.Count > 1)
@@ -1243,6 +1241,14 @@ HRESULT initShadow(ID3D11Device* pd3dDevice, int width, int height)
     descDSV.Texture2D.MipSlice = 0;
     pd3dDevice->CreateDepthStencilView(shadowTexture, &descDSV, &shadowDSV);
     DXUT_SetDebugName(shadowDSV, "ShadowDSV");
+
+    D3D11_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc;
+    ZeroMemory(&shaderResourceViewDesc, sizeof(D3D11_SHADER_RESOURCE_VIEW_DESC));
+    shaderResourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    shaderResourceViewDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    shaderResourceViewDesc.Texture2D.MipLevels = 1;
+    pd3dDevice->CreateShaderResourceView(shadowTexture, &shaderResourceViewDesc, &shadowSRV);
+    DXUT_SetDebugName(shadowSRV, "Shadow SRV");
 
     return S_OK;
 }
@@ -1298,8 +1304,8 @@ HRESULT CALLBACK OnD3D11CreateDevice(ID3D11Device* pd3dDevice, const DXGI_SURFAC
     XMVECTOR vecAt = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
     camera.SetViewParams(vecEye, vecAt);
 
-    XMFLOAT3 light(lightPos.load().x, lightPos.load().y, lightPos.load().z);
-    lightCamera.SetViewParams(XMLoadFloat3(&light), vecAt);
+    XMVECTOR light = XMVectorSet(lightPos.load().x, lightPos.load().y, lightPos.load().z, 0.0f);
+    lightCamera.SetViewParams(light, vecAt);
 
     setUpDialog.DestroyDialog();
 
@@ -1412,31 +1418,37 @@ bool drawObjects(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
     pd3dImmediateContext->GSSetShader(renderGS, nullptr, 0);
     pd3dImmediateContext->PSSetShader(renderPS, nullptr, 0);
 
-    ID3D11ShaderResourceView* aRViews[3] = { particleSRV1, faceSRV, shadowSRV };
+    ID3D11ShaderResourceView* aRViews[3] = { particleSRV1, faceSRV, nullptr };
     pd3dImmediateContext->VSSetShaderResources(0, 3, aRViews);
     pd3dImmediateContext->GSSetShaderResources(0, 3, aRViews);
+    pd3dImmediateContext->PSSetShaderResources(0, 3, aRViews);
 
+    // Get light data
+    VECTOR4 lp = lightPos.load();
+    lightCamera = camera;
+    lightCamera.SetViewParams(XMVectorSet(lp.x, lp.y, lp.z, 0.0f), camera.GetLookAtPt());
+    XMMATRIX lView = lightCamera.GetViewMatrix();
+    XMMATRIX lProj = lightCamera.GetProjMatrix();
+
+    // Update constant buffers: draw shadow map "normally", with lViewProj instead of mViewProj
     D3D11_MAPPED_SUBRESOURCE MappedResource;
     pd3dImmediateContext->Map(gsConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource);
     auto pCBGS = reinterpret_cast<CB_GS*>(MappedResource.pData);
-    XMStoreFloat4x4(&pCBGS->worldViewProjection, XMMatrixMultiply(mView, mProj));
+    XMStoreFloat4x4(&pCBGS->worldViewProjection, XMMatrixMultiply(lView, lProj));
     XMStoreFloat4x4(&pCBGS->inverseView, XMMatrixInverse(nullptr, mView));
-    XMStoreFloat4x4(&pCBGS->lightViewProjection, XMMatrixMultiply(lightCamera.GetViewMatrix(), lightCamera.GetProjMatrix()));
+    XMStoreFloat4x4(&pCBGS->lightViewProjection, XMMatrixMultiply(lView, lProj));
     XMStoreFloat4(&pCBGS->eyePos, camera.GetEyePt());
     pCBGS->lightPos = lightPos;
     pCBGS->lightCol = lightCol;
     pd3dImmediateContext->Unmap(gsConstantBuffer, 0);
     pd3dImmediateContext->GSSetConstantBuffers(0, 1, &gsConstantBuffer);
-
-    pd3dImmediateContext->PSSetShaderResources(0, 1, &particleTextureSRV);
     pd3dImmediateContext->PSSetSamplers(0, 1, &samplerState);
-
     float bf[] = { 0.f, 0.f, 0.f, 0.f };
     pd3dImmediateContext->OMSetBlendState(blendState, bf, 0xFFFFFFFF);
     pd3dImmediateContext->OMSetDepthStencilState(depthStencilState, 0);
 
 
-    // draw shadow map
+    // Draw shadow map only to depth texture
     auto pRTV = DXUTGetD3D11RenderTargetView();
     auto pDSV = DXUTGetD3D11DepthStencilView();
     pd3dImmediateContext->OMSetRenderTargets(0, nullptr, shadowDSV);
@@ -1444,15 +1456,28 @@ bool drawObjects(ID3D11DeviceContext* pd3dImmediateContext, CXMMATRIX mView, CXM
     pd3dImmediateContext->Draw(faceCount, 0);
 
 
-    // draw normal objects: set real WVP matrix, render scene
+    // Draw normal objects: set real MVP matrix, render scene
+    D3D11_MAPPED_SUBRESOURCE MappedResource2;
+    pd3dImmediateContext->Map(gsConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource2);
+    auto pCBGS2 = reinterpret_cast<CB_GS*>(MappedResource2.pData);
+    XMStoreFloat4x4(&pCBGS2->worldViewProjection, XMMatrixMultiply(mView, mProj));
+    XMStoreFloat4x4(&pCBGS2->inverseView, XMMatrixInverse(nullptr, mView));
+    XMStoreFloat4x4(&pCBGS2->lightViewProjection, XMMatrixMultiply(lView, lProj));
+    XMStoreFloat4(&pCBGS2->eyePos, camera.GetEyePt());
+    pCBGS2->lightPos = lightPos;
+    pCBGS2->lightCol = lightCol;
+    pd3dImmediateContext->Unmap(gsConstantBuffer, 0);
+    pd3dImmediateContext->GSSetConstantBuffers(0, 1, &gsConstantBuffer);
     pd3dImmediateContext->OMSetRenderTargets(1, &pRTV, pDSV);
+    pd3dImmediateContext->ClearDepthStencilView(pDSV, D3D11_CLEAR_DEPTH, 1.0, 0);
+    aRViews[2] = shadowSRV;
+    pd3dImmediateContext->PSSetShaderResources(0, 3, aRViews);
     pd3dImmediateContext->Draw(faceCount, 0);
 
     ID3D11ShaderResourceView* pxSRVNULL[3] = { nullptr, nullptr, nullptr };
     pd3dImmediateContext->VSSetShaderResources(0, 3, pxSRVNULL);
     pd3dImmediateContext->GSSetShaderResources(0, 3, pxSRVNULL);
-    ID3D11ShaderResourceView* ppSRVNULL[1] = { nullptr };
-    pd3dImmediateContext->PSSetShaderResources(0, 1, ppSRVNULL);
+    pd3dImmediateContext->PSSetShaderResources(0, 3, pxSRVNULL);
 
     pd3dImmediateContext->GSSetShader(nullptr, nullptr, 0);
     pd3dImmediateContext->OMSetBlendState(pBlendState0, &BlendFactor0.x, SampleMask0); SAFE_RELEASE(pBlendState0);
