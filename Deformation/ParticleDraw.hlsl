@@ -13,6 +13,8 @@
 // DEFINITIONS
 //--------------------------------------------------------------------------------------
 
+#define depth_bias              0.00001f
+
 struct BufferVertex
 {
     float4 pos			: WPOS;
@@ -93,9 +95,9 @@ cbuffer cbImmutable
     static float3 g_positions[4] =
     {
         float3(-1, 1, 0),
-        float3(1, 1, 0),
-        float3(-1, -1, 0),
         float3(1, -1, 0),
+        float3(-1, -1, 0),
+        float3(1, 1, 0),
     };
 
     static float2 g_texcoords[4] =
@@ -109,9 +111,9 @@ cbuffer cbImmutable
     static float4 g_table[4] = 
     {
         float4(-10000, -1000, -10000, 1),
-        float4(-10000, -1000, 10000, 1),
+        float4(10000, -1000, -10000, 1),
         float4(10000, -1000, 10000, 1),
-        float4(10000, -1000, -10000, 1)
+        float4(-10000, -1000, 10000, 1)
     };
 };
 
@@ -238,7 +240,8 @@ float4 PSObjectDraw(ObjectVertex input) : SV_Target
     float depth = g_txShadowMap.Sample(g_samLinear, input.lpos.xy).r;
 
     // decide if in shadow: shadow map depth is less than fragment depth
-    if (depth < input.lpos.z){
+    //if (depth < input.lpos.z){
+    if (abs(depth - input.lpos.z) > depth_bias){
         return ka;
     }
     else
